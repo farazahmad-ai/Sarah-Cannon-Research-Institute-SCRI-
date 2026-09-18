@@ -18,12 +18,19 @@ from app.database.session import (
     get_db_session,
 )
 
+from app.database.supabase import (
+    get_supabase_admin,
+    init_supabase_admin,
+)
+
 __all__ = [
     "Base",
     "TimestampMixin",
     "engine",
     "async_session_factory",
     "get_db_session",
+    "init_supabase_admin",
+    "get_supabase_admin",
     "Profile",
     "ClinicalTrial",
     "TrialChunk",

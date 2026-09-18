@@ -5,10 +5,49 @@ Never call `os.getenv()` or `load_dotenv()` directly in application code.
 Fails fast on startup if critical configuration keys are missing.
 """
 
+import os
 from functools import lru_cache
+from pathlib import Path
 from typing import List, Union
+
+import certifi
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _ensure_local_ca_certs() -> None:
+    r"""Ensure SSL_CERT_FILE points to a local disk copy of certifi CA bundle.
+    
+    Why this is essential on Windows virtual filesystems (e.g. Google Drive G:\):
+    OpenSSL's underlying C library load_verify_locations() blocks or deadlocks
+    when reading CA bundles through virtual filesystem drivers. Mirroring the cert
+    to the user's local ~/.cache directory resolves SSL in < 0.1s.
+    """
+    if os.environ.get("SSL_CERT_FILE") and Path(os.environ["SSL_CERT_FILE"]).exists():
+        return
+
+    try:
+        cert_source = Path(certifi.where())
+        # If certifi is already on C: drive, no action needed
+        if cert_source.drive.upper() == "C:":
+            return
+
+        local_cache_dir = Path.home() / ".cache" / "scri_oncology"
+        local_cache_dir.mkdir(parents=True, exist_ok=True)
+        local_cert = local_cache_dir / "cacert.pem"
+
+        if not local_cert.exists() or local_cert.stat().st_size != cert_source.stat().st_size:
+            with open(cert_source, "rb") as src, open(local_cert, "wb") as dst:
+                dst.write(src.read())
+
+        os.environ["SSL_CERT_FILE"] = str(local_cert)
+    except Exception:
+        pass  # Non-fatal fallback
+
+
+# Initialize SSL cert configuration immediately upon module load
+_ensure_local_ca_certs()
+
 
 
 class Settings(BaseSettings):

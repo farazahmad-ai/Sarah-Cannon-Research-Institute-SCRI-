@@ -12,6 +12,7 @@ from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
+from app.database import init_supabase_admin
 
 
 @asynccontextmanager
@@ -27,6 +28,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     print(f"[STARTUP] Starting {settings.APP_NAME} in [{settings.ENVIRONMENT}] mode")
     print(f"[CONFIG] Primary LLM: {settings.OPENAI_CHAT_MODEL} | Embedding: {settings.OPENAI_EMBEDDING_MODEL}")
     print(f"[SECURITY] Allowed CORS Origins: {settings.ALLOWED_ORIGINS}")
+    
+    # Eagerly initialize and validate Supabase AsyncClient (Fail-Fast)
+    await init_supabase_admin()
+    print("[AUTH] Supabase AsyncClient initialized successfully (persist_session=False)")
     
     yield  # Application is running and serving requests
     
