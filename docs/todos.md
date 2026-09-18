@@ -65,7 +65,7 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
   - Properties: `effective_api_key`, `effective_base_url`, `sync_database_url` (for Alembic), and `async_database_url` (for SQLAlchemy)
   - Verified live connection to OpenRouter embeddings and chat completions
 
-- [x] **2.3 Database Engine & Session Management:**
+- [x] **2.3 Database Engine, Session & Supabase Platform Client:**
   - [x] File: `backend/app/database/__init__.py`
   - [x] File: `backend/app/database/session.py`:
     - Configure SQLAlchemy 2.0 `create_async_engine` using `settings.async_database_url`
@@ -73,6 +73,11 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
     - Create FastAPI dependency `get_db_session()` for route handlers
   - [x] File: `backend/app/database/base.py`:
     - Declarative `Base` with common timestamp mixins (`created_at`, `updated_at`)
+  - [x] File: `backend/app/database/supabase.py`:
+    - Asynchronous administrative client wrapper using native `AsyncClient` and `acreate_client`
+    - Configured with `AsyncClientOptions(persist_session=False, auto_refresh_token=False)` for stateless multi-tenant request isolation
+    - Eager `init_supabase_admin()` in FastAPI lifespan for fail-fast credential validation and zero race conditions
+    - FastAPI dependency getter `get_supabase_admin()` returning the initialized `AsyncClient`
 
 - [x] **2.4 SQLAlchemy Declarative Models:**
   - [x] File: `backend/app/database/models.py`:
