@@ -1,0 +1,93 @@
+# ==============================================================================
+# Sarah Cannon Research Institute (SCRI) Document Copilot - .gitignore
+# Single source of truth for repository exclusions
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Environment Variables & Secrets (CRITICAL)
+# Never commit real API keys, Supabase service roles, or database credentials
+# ------------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# ------------------------------------------------------------------------------
+# 2. Python Virtual Environments & Bytecode
+# ------------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Distribution & Build artifacts
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing, Linting & Coverage
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# ------------------------------------------------------------------------------
+# 3. Node.js & Frontend Build Artifacts
+# ------------------------------------------------------------------------------
+node_modules/
+frontend/dist/
+frontend/build/
+.pnpm-store/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ------------------------------------------------------------------------------
+# 4. Clinical Data Cache & Downloads (per AGENTS.md)
+# Raw ClinicalTrials.gov JSON files can be re-acquired using data/download.py
+# ------------------------------------------------------------------------------
+data/downloads/
+
+# ------------------------------------------------------------------------------
+# 5. Operating System & IDE Cache
+# ------------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+
+# IDE configurations (preserve shared settings if needed, ignore local user state)
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Local agent scratchpads and task logs
+.gemini/
+*.log
+
+# Local developer notes & scratchpads (private)
+*.local.md
+*.scratch.md
