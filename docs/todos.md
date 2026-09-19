@@ -190,32 +190,36 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
   - [ ] File: `backend/app/api/trials.py`:
     - `GET /api/trials`: List 25 landmark trials with metadata
     - `GET /api/trials/{nct_id}`: Full protocol inspector endpoint
-  - [ ] File: `backend/app/api/router.py`:
-    - Central API router registering chat and trials routes
-  - [ ] File: `backend/app/main.py`:
+  - [x] File: `backend/app/api/router.py`:
+    - Central API router registering all feature sub-routers under `/api` prefix
+    - `GET /api/me`: Smoke-test endpoint returning `AuthenticatedUser` (proves end-to-end JWT chain)
+  - [x] File: `backend/app/main.py`:
     - FastAPI app factory, CORS middleware, lifespan events, healthcheck route (`GET /health`)
+    - Mounts `api_router` from `app.api.router`
 
 ---
 
 ## Phase 6: Frontend Clinical UI (in `frontend/`)
 
-- [ ] **6.1 Scaffolding & Build Tooling:**
-  - [ ] Initialize Vite + React 18+ Single Page Application with TypeScript (`pnpm create vite . --template react-ts`)
-  - [ ] File: `frontend/package.json`:
-    - Dependencies: `@ai-sdk/react`, `@supabase/supabase-js`, `react-router-dom`, `lucide-react`, `clsx`, `tailwind-merge`
-    - Dev dependencies: `tailwindcss`, `@tailwindcss/vite`
-  - [ ] File: `frontend/vite.config.ts`: Vite build configuration
-  - [ ] File: `frontend/src/index.css`: Tailwind CSS styling rules
-  - [ ] Initialize shadcn/ui components (`button`, `input`, `badge`, `popover`, `dialog`, `tabs`, `scroll-area`, `card`)
+- [x] **6.1 Scaffolding & Build Tooling:**
+  - [x] Initialize Vite + React 19 Single Page Application with TypeScript (`pnpm create vite . --template react-ts`)
+  - [x] File: `frontend/package.json`:
+    - Dependencies: `@ai-sdk/react`, `@supabase/supabase-js`, `react-router-dom`, `lucide-react`, `clsx`, `tailwind-merge`, `@base-ui/react`
+    - Dev dependencies: `tailwindcss` (v4), `@tailwindcss/vite`
+  - [x] File: `frontend/vite.config.ts`: Vite build configuration with `@tailwindcss/vite` and `@/*` alias
+  - [x] File: `frontend/src/index.css`: Tailwind CSS v4 directives and Nova theme tokens
+  - [x] Initialize shadcn/ui with Base UI Nova preset (`components.json`, `src/lib/utils.ts`, `src/components/ui/button.tsx`)
 
-- [ ] **6.2 Environment & Auth Client:**
-  - [ ] File: `frontend/src/lib/env.ts`: Single source of truth for frontend environment variables (`VITE_API_BASE_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`)
-  - [ ] File: `frontend/src/lib/supabase.ts`: Supabase browser client
-  - [ ] File: `frontend/src/context/AuthContext.tsx`: Institutional email auth session provider
-  - [ ] File: `frontend/src/pages/Login.tsx`: Clinical login screen with `@scri.com` / `@hcahealthcare.com` email validation
 
-- [ ] **6.3 API Client & Bearer Token Injection:**
-  - [ ] File: `frontend/src/lib/api.ts`: Fetch wrapper that automatically attaches the Supabase session JWT to outbound requests
+- [x] **6.2 Environment, Auth Client & Login Page:**
+  - [x] File: `frontend/src/lib/env.ts`: Single source of truth for frontend environment variables (`VITE_API_BASE_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`)
+  - [x] File: `frontend/src/lib/supabase.ts`: Supabase browser client (singleton, `persistSession: true`, `autoRefreshToken: true`)
+  - [x] File: `frontend/src/lib/api.ts`: Fetch wrapper that automatically attaches the Supabase session JWT to outbound requests; typed `api.me()`, `api.trials.*`, `api.chat.*` helpers
+  - [x] File: `frontend/src/context/AuthContext.tsx`: Institutional email auth session provider
+  - [x] File: `frontend/src/pages/Login.tsx`: Clinical login screen with email + password (`signInWithPassword`)
+  - [x] File: `frontend/src/components/ProtectedRoute.tsx`: Redirect unauthenticated users to `/login`
+  - [x] File: `frontend/src/App.tsx`: React Router wired with `AuthProvider`, `/login` route, and protected `/` route
+  - [x] File: `frontend/src/pages/Dashboard.tsx`: Auth smoke-test screen — calls `GET /api/me` and displays backend-verified identity
 
 - [ ] **6.4 Clinical Chat Interface:**
   - [ ] File: `frontend/src/components/chat/ChatContainer.tsx`: Streaming conversation view using Vercel AI SDK `useChat`

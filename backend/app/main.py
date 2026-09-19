@@ -11,6 +11,7 @@ from typing import Any, AsyncGenerator, Dict
 from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.router import api_router
 from app.config import settings
 from app.database import init_supabase_admin
 
@@ -68,6 +69,8 @@ def create_application() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    application.include_router(api_router)
 
     return application
 
