@@ -102,27 +102,34 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
 
 ---
 
-## Phase 3: Ingestion, Chunking & Embedding Pipeline (in `backend/app/ingest`)
+## Phase 3: Ingestion, Chunking & Embedding Pipeline (in `backend/app/ingest`) (Completed ✅)
 
-- [ ] **3.1 Section-Aware Protocol Chunker:**
-  - [ ] File: `backend/app/ingest/__init__.py`
-  - [ ] File: `backend/app/ingest/chunker.py`:
-    - Split protocols along clinical boundaries (Study Design, Arms/Interventions, Inclusion Criteria, Exclusion Criteria, Endpoints)
-    - Preserve numbered criteria, lab limits (ANC, platelets, CrCl), and prior therapy washout intervals within individual chunks
-    - Include trial header context (NCT ID, amendment date, brief title) on every chunk for retrieval preservation
-    - Enforce token ceiling (400–600 tokens per chunk) with semantic boundary preservation
+- [x] **3.1 Section-Aware Protocol Chunker:**
+  - [x] File: `backend/app/ingest/__init__.py`
+  - [x] File: `backend/app/ingest/chunker.py`:
+    - Custom clinical boundary chunker — pure Python, zero external chunking libraries
+    - Navigates JSON key paths directly (`protocolSection.eligibilityModule.eligibilityCriteria`)
+    - Each `*` bullet in eligibility criteria becomes its own atomic ChunkPayload
+    - Sub-bullets (qualifying conditions) kept attached to parent criterion — never split mid-criterion
+    - Context prefix `[NCT ID | Phase | Category]` prepended to embed_text for identity-aware vectors
+    - Token estimate via word_count × 1.3 heuristic (no tiktoken dependency)
+    - Produces: BRIEF_SUMMARY (1) + STUDY_DESIGN (1) + ELIGIBILITY_INCLUSION (N) + ELIGIBILITY_EXCLUSION (N)
 
-- [ ] **3.2 Embedding Generation Service:**
-  - [ ] File: `backend/app/retrieval/embeddings.py`:
-    - Async client for batch embedding generation using `openai/text-embedding-3-small` (1536 dims)
-    - Retry logic with exponential backoff and rate-limit handling
+- [x] **3.2 Embedding Generation Service:**
+  - [x] File: `backend/app/retrieval/__init__.py`
+  - [x] File: `backend/app/retrieval/embeddings.py`:
+    - Async batched calls to OpenAI-compatible API via OpenRouter (`openai/text-embedding-3-small`)
+    - Batch size: 64 texts per API call; exponential backoff on 429/5xx errors (up to 5 retries)
+    - Returns `list[list[float]]` — 1536-dim vectors, one per input chunk
+    - Dimension sanity check against `settings.OPENAI_EMBEDDING_DIMENSIONS` before DB write
 
-- [ ] **3.3 Ingestion Pipeline Script:**
-  - [ ] File: `backend/app/ingest/pipeline.py`:
-    - CLI runner to iterate `data/downloads/manifest.json`
-    - Parse all 25 downloaded clinical trials, extract metadata, chunk sections, generate embeddings
-    - Upsert trials into `clinical_trials` table and chunks into `trial_chunks` table in Supabase
-    - Validate row counts, embedding dimensions, and index health
+- [x] **3.3 Ingestion Pipeline Script:**
+  - [x] File: `backend/app/ingest/pipeline.py`:
+    - CLI with staged flags: `--dry-run`, `--limit N`, `--nct-id`, `--one-per-category`, `--skip-embed`
+    - Reads `data/downloads/manifest.json`, resolves local JSON paths, calls chunker + embeddings
+    - Upserts `clinical_trials` via `ON CONFLICT DO UPDATE` (idempotent re-runs)
+    - Deletes + bulk re-inserts `trial_chunks` per trial (clean slate on re-ingest)
+    - **Result: 25 trials | 460 chunks | 460 embeddings (dim=1536) committed to Supabase**
 
 ---
 
