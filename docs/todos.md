@@ -47,11 +47,10 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
   - [x] Configure `backend/pyproject.toml` with project name `scri-copilot-backend`, Hatchling build system, and dependencies
   - [x] Create `backend/app/__init__.py` (Root application package)
   - [ ] Scaffold internal module directories and empty `__init__.py` files:
-    - `backend/app/api/` (FastAPI route handlers)
-    - `backend/app/assistant/` (PydanticAI agent, prompts, and dependencies)
-    - `backend/app/auth/` (Supabase JWT verification)
-    - `backend/app/chat/` (Chat turn orchestration & streaming)
-    - `backend/app/database/` (SQLAlchemy models and session helpers)
+    - [x] `backend/app/api/` (FastAPI route handlers)
+    - [ ] `backend/app/assistant/` (PydanticAI agent, prompts, and dependencies)
+    - [x] `backend/app/auth/` (Supabase JWT verification)
+    - [ ] `backend/app/chat/` (Chat turn orchestration & streaming)
     - `backend/app/grounding/` (Citation and grounding validator)
     - `backend/app/ingest/` (Chunking and trial ingestion pipeline)
     - `backend/app/retrieval/` (pgvector, full-text search, and RRF fusion)
@@ -156,46 +155,78 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
 
 ---
 
-## Phase 5: PydanticAI Agent & Citation Grounding Gate (in `backend/app/assistant`)
+## Phase 5: Chat Shell Vertical Slice — Backend (in `backend/app/`)
 
-- [ ] **5.1 PydanticAI Schemas & Dependencies:**
-  - [ ] File: `backend/app/assistant/schemas.py`:
-    - Pydantic models: `GroundedAnswer`, `Citation`, `ProtocolPassage`, `ChatRequest`, `ChatResponseDelta`
+> This phase builds the complete backend chat pipeline with a **stub retriever** replacing
+> real pgvector search. Real retrieval is wired in Phase 4 (reverse order for velocity).
+> Every endpoint requires a valid Supabase JWT — 403 on missing/invalid token.
+
+- [x] **5.1 Shared Chat Schemas:**
+  - [x] File: `backend/app/assistant/__init__.py`: Package marker
+  - [x] File: `backend/app/assistant/schemas.py`:
+    - `ChatRequest` — `thread_id: uuid | None`, `message: str`
+    - `ThreadOut` — `id`, `title`, `created_at` (response model for thread endpoints)
+    - `MessageOut` — `id`, `thread_id`, `role`, `content`, `created_at`
+    - `ProtocolPassage` — stub chunk shape (`nct_id`, `section_header`, `chunk_text`) used by orchestrator
+
+- [x] **5.2 Chat CRUD — Database Layer:**
+  - [x] File: `backend/app/database/chats.py` (as specified in architecture `database/chats.py`):
+    - `upsert_profile(session, user_id, email)` — INSERT … ON CONFLICT DO NOTHING so first-chat auto-creates the `profiles` row from JWT identity (required: `ChatThread.user_id` FK to `profiles.id`)
+    - `create_thread(session, user_id, title) → ChatThread`
+    - `list_threads(session, user_id) → list[ChatThread]` — ordered newest-first
+    - `get_thread(session, thread_id, user_id) → ChatThread | None` — ownership-checked
+    - `delete_thread(session, thread_id, user_id)` — raises 404 if not found, 403 if wrong owner
+    - `list_messages(session, thread_id, user_id) → list[ChatMessage]` — oldest-first
+    - `persist_turn(session, thread_id, user_content, assistant_content)` — writes user + assistant `ChatMessage` rows in one transaction after stream completes
+
+- [x] **5.3 Streaming Chat Orchestrator:**
+  - [x] File: `backend/app/chat/__init__.py`: Package marker
+  - [x] File: `backend/app/chat/orchestrator.py`:
+    - `stream_chat_turn(db, user, request) → AsyncGenerator[str, None]`
+    1. Call `upsert_profile()` — ensures profiles row exists for JWT user
+    2. Create or load `ChatThread` (create new if `thread_id=None`; ownership-check if UUID given)
+    3. Call `_stub_retrieve(message)` → returns 1 hardcoded `ProtocolPassage` (replaced by `hybrid.retrieve()` in Phase 4, no other changes needed)
+    4. Load last 10 messages from thread as conversation history
+    5. Build OpenAI messages array: system prompt + history + user turn with stub passage as context
+    6. Call `openai.AsyncOpenAI` (using `settings.effective_api_key` / `settings.effective_base_url`) with `stream=True`
+    7. Yield each token delta as Vercel AI SDK data-stream frame: `0:"<token>"\n`
+    8. After stream closes, call `persist_turn()` to write both messages to DB in one transaction
+    9. Yield final frame: `d:{"finishReason":"stop"}\n`
+
+- [x] **5.4 FastAPI Chat Endpoints:**
+  - [x] File: `backend/app/api/chat.py` — all routes require `get_current_user`:
+    - `POST /api/chat/threads` → create thread → `ThreadOut` (201)
+    - `GET /api/chat/threads` → list user's threads → `list[ThreadOut]`
+    - `DELETE /api/chat/threads/{thread_id}` → delete (ownership-check) → 204
+    - `GET /api/chat/threads/{thread_id}/messages` → history → `list[MessageOut]`
+    - `POST /api/chat/stream` → `StreamingResponse(media_type="text/event-stream")` wrapping `stream_chat_turn()`
+  - [x] File: `backend/app/api/router.py`:
+    - Central API router registering all feature sub-routers under `/api` prefix
+    - `GET /api/me`: Smoke-test endpoint returning `AuthenticatedUser` (proves end-to-end JWT chain)
+    - [x] Register `chat_router` from `app.api.chat` under `/api`
+  - [x] File: `backend/app/main.py`:
+    - FastAPI app factory, CORS middleware, lifespan events, healthcheck route (`GET /health`)
+    - Mounts `api_router` from `app.api.router`
+
+- [ ] **5.5 PydanticAI Agent & Grounding (Post-retrieval — Phase 5 proper):**
   - [ ] File: `backend/app/assistant/deps.py`:
     - `OncologyAgentDeps` holding DB session, user session, hybrid retriever instance, and settings
-
-- [ ] **5.2 Clinical System Prompt & Agent:**
   - [ ] File: `backend/app/assistant/prompts.py`:
     - Oncology system prompt with strict negative constraints
     - Explicit instruction: *"If the protocol does not state a criterion, explicitly state: 'The protocol does not state [X].'"*
     - Mandatory bracketed citation formatting: `[NCTxxxxxxx, Section Title: Criterion #]`
   - [ ] File: `backend/app/assistant/agent.py`:
-    - PydanticAI agent configuration with `openai/gpt-4o` and structured dependencies
-
-- [ ] **5.3 Grounding & Citation Validator:**
+    - PydanticAI agent configuration with `openai/gpt-4o` and structured typed dependencies
   - [ ] File: `backend/app/grounding/validator.py`:
     - Post-processing validator ensuring every citation references a chunk that was actually retrieved
     - Validates verbatim quote matches the source chunk text
     - Strips or flags any hallucinated or ungrounded claims
 
-- [ ] **5.4 FastAPI Endpoints & Streaming SSE:**
-  - [ ] File: `backend/app/auth/jwt.py`:
-    - Supabase JWT token verification and `get_current_user` FastAPI dependency
-  - [ ] File: `backend/app/chat/orchestrator.py`:
-    - Handles chat turn lifecycle: persists user message, retrieves chunks, runs PydanticAI agent, persists assistant response and citations
-  - [ ] File: `backend/app/api/chat.py`:
-    - `POST /api/chat/stream`: Server-Sent Events (SSE) streaming endpoint compatible with Vercel AI SDK
-    - `GET /api/chat/threads`: List past user chat threads
-    - `GET /api/chat/threads/{thread_id}/messages`: Fetch message history with citations
+- [ ] **5.6 Protocol & Trial Endpoints (for Phase 6.6 Trial Catalog):**
   - [ ] File: `backend/app/api/trials.py`:
-    - `GET /api/trials`: List 25 landmark trials with metadata
-    - `GET /api/trials/{nct_id}`: Full protocol inspector endpoint
-  - [x] File: `backend/app/api/router.py`:
-    - Central API router registering all feature sub-routers under `/api` prefix
-    - `GET /api/me`: Smoke-test endpoint returning `AuthenticatedUser` (proves end-to-end JWT chain)
-  - [x] File: `backend/app/main.py`:
-    - FastAPI app factory, CORS middleware, lifespan events, healthcheck route (`GET /health`)
-    - Mounts `api_router` from `app.api.router`
+    - `GET /api/trials` → list active trials with phase/cancer type filters → `list[TrialSummary]`
+    - `GET /api/trials/{nct_id}` → full trial detail with all criteria and eligibility rules → `TrialDetail`
+    - Powers the Phase 6.6 Protocol Viewer / Trial Catalog once the `clinical_trials` table is populated via Phase 3 ingestion.
 
 ---
 
@@ -221,10 +252,25 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
   - [x] File: `frontend/src/App.tsx`: React Router wired with `AuthProvider`, `/login` route, and protected `/` route
   - [x] File: `frontend/src/pages/Dashboard.tsx`: Auth smoke-test screen — calls `GET /api/me` and displays backend-verified identity
 
-- [ ] **6.4 Clinical Chat Interface:**
-  - [ ] File: `frontend/src/components/chat/ChatContainer.tsx`: Streaming conversation view using Vercel AI SDK `useChat`
-  - [ ] File: `frontend/src/components/chat/ChatMessage.tsx`: Markdown message renderer with inline interactive citation pill badges
-  - [ ] File: `frontend/src/components/chat/ChatInput.tsx`: Prompt composer with quick coordinator screening suggestions (washout rules, biomarker eligibility, lab limits)
+- [x] **6.4 Chat Shell — Frontend:**
+  - [x] File: `frontend/src/lib/api.ts` **(extend existing)**:
+    - Add `api.chat.createThread()` → `ThreadOut`
+    - Add `api.chat.deleteThread(id)` → `void`
+    - Export `ThreadOut` and `MessageOut` TypeScript interfaces matching backend schemas
+  - [x] File: `frontend/src/App.tsx` **(modify existing)**:
+    - Add `/chat` and `/chat/:threadId` routes (both `ProtectedRoute`)
+    - Redirect `/` → `/chat`
+    - Remove old `Dashboard` import
+  - [x] File: `frontend/src/pages/ChatPage.tsx`: Top-level page for `/chat/:threadId?` — split layout (ThreadSidebar left, ChatContainer right)
+  - [x] File: `frontend/src/components/chat/ThreadSidebar.tsx`:
+    - Load `api.chat.threads()` on mount
+    - "New chat" button → `api.chat.createThread()` → navigate to `/chat/<new-id>`
+    - Thread list: each item navigates to `/chat/<id>`, highlights active thread
+    - Delete (×) button per thread
+    - User email + Sign out at bottom
+  - [x] File: `frontend/src/components/chat/ChatContainer.tsx`: Streaming conversation view with Vercel AI SDK data-stream protocol and `Authorization` header injection
+  - [x] File: `frontend/src/components/chat/ChatMessage.tsx`: User (right-aligned) and assistant (left-aligned) message bubbles with formatted clinical citation pills
+  - [x] File: `frontend/src/components/chat/ChatInput.tsx`: Auto-growing textarea, Enter submits / Shift+Enter newline, disabled+spinner when streaming, quick-prompt chips
 
 - [ ] **6.5 Interactive Evidence Inspection & Citation Popovers:**
   - [ ] File: `frontend/src/components/citations/CitationPill.tsx`: Clickable badge (`[NCT07659782, Exclusion #4]`)

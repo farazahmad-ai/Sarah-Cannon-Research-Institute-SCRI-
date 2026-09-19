@@ -6,7 +6,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "@/context/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Login } from "@/pages/Login";
-import { Dashboard } from "@/pages/Dashboard";
+import { ChatPage } from "@/pages/ChatPage";
 
 function App() {
   return (
@@ -15,15 +15,24 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route
-            path="/"
+            path="/chat"
             element={
               <ProtectedRoute>
-                <Dashboard />
+                <ChatPage />
               </ProtectedRoute>
             }
           />
-          {/* Catch-all: unknown paths fall back to root (ProtectedRoute handles auth) */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route
+            path="/chat/:threadId"
+            element={
+              <ProtectedRoute>
+                <ChatPage />
+              </ProtectedRoute>
+            }
+          />
+          {/* Default redirect: / and unknown routes point to /chat (ProtectedRoute handles auth) */}
+          <Route path="/" element={<Navigate to="/chat" replace />} />
+          <Route path="*" element={<Navigate to="/chat" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
