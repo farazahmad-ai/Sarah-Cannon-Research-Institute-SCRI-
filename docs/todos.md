@@ -136,12 +136,12 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
 
 ---
 
-## Phase 4: Hybrid Retrieval Engine (in `backend/app/retrieval`)
+## Phase 4: Hybrid Retrieval Engine (in `backend/app/retrieval`) (Completed ✅)
 
 ### Pre-Phase 4 Gate & Foundation
 - [x] **Gate A1 — Embedding Completeness:** `SELECT count(*) FROM trial_chunks WHERE embedding IS NULL` == 0 *(Verified: 563/563 non-null vectors)*
 - [x] **Gate A2 — Exclusion Labeling:** `SELECT count(*) FROM trial_chunks WHERE section_type='ELIGIBILITY_EXCLUSION'` == 268 *(Verified: 268 exclusion chunks)*
-- [ ] **Gate A3 — Working Tree Cleanliness:** Commit all pre-Phase 4 audit fixes so Phase 4 diffs remain isolated and bisectable.
+- [x] **Gate A3 — Working Tree Cleanliness:** Commit all pre-Phase 4 audit fixes so Phase 4 diffs remain isolated and bisectable.
 - [x] **Gate A4 — Architectural Decisions Locked:**
   - **B1 (File Names):** `rrf.py` and `hybrid.py` locked across `todos.md` and `architecture.md`.
   - **B2 (Header in FTS):** Migration `0002` will widen `search_vector` trigger to `chunk_text || ' ' || section_header` with a backfill update (no re-embedding required).
@@ -154,16 +154,16 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
 
 ### Step-by-Step Implementation Sequence (Ordered Build)
 
-- [ ] **Step 1: Pytest Setup, Test Skeleton & Schema Extension:**
-  - [ ] File: `backend/pyproject.toml`:
+- [x] **Step 1: Pytest Setup, Test Skeleton & Schema Extension:**
+  - [x] File: `backend/pyproject.toml`:
     - Add `[tool.pytest.ini_options]` with `integration` marker:
       ```toml
       [tool.pytest.ini_options]
       markers = ["integration: needs live Supabase + embedding API"]
       addopts = "-m 'not integration'"
       ```
-  - [ ] Create `backend/tests/__init__.py`
-  - [ ] File: `backend/app/assistant/schemas.py`:
+  - [x] Create `backend/tests/__init__.py`
+  - [x] File: `backend/app/assistant/schemas.py`:
     - Extend `ProtocolPassage` with join key and display fields:
       ```python
       class ProtocolPassage(BaseModel):
@@ -177,17 +177,17 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
           brief_title: str | None = None
       ```
 
-- [ ] **Step 2: Reciprocal Rank Fusion (RRF) & Unit Tests (Pure, Offline):**
-  - [ ] File: `backend/app/retrieval/rrf.py`:
+- [x] **Step 2: Reciprocal Rank Fusion (RRF) & Unit Tests (Pure, Offline):**
+  - [x] File: `backend/app/retrieval/rrf.py`:
     - Implement `reciprocal_rank_fusion(ranked_lists: list[list[uuid.UUID]], k: int = 60) -> list[tuple[uuid.UUID, float]]`
     - Returns `(chunk_id, fused_score)` sorted descending, deduplicated
     - Deterministic tie-breaking by `chunk_id`
     - Pure in-memory math, no DB or network I/O
-  - [ ] File: `backend/tests/test_rrf.py`:
+  - [x] File: `backend/tests/test_rrf.py`:
     - Unit tests: hand-computed ranking order, $1/(60+rank)$ calculation, score summation when chunk is in both lists, tie-breaking, empty input handling
 
-- [ ] **Step 3: Protocol Chunker Corpus Invariant Tests (Offline):**
-  - [ ] File: `backend/tests/test_chunker.py`:
+- [x] **Step 3: Protocol Chunker Corpus Invariant Tests (Offline):**
+  - [x] File: `backend/tests/test_chunker.py`:
     - Offline regression tests over all 25 downloaded JSONs:
       - `total_chunks == 563`
       - Exactly 1 `BRIEF_SUMMARY` per trial
@@ -197,39 +197,39 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
       - Non-empty `section_header` and `chunk_text` on every chunk
       - `(nct_id, chunk_index)` uniqueness
 
-- [ ] **Step 4: Migration 0002 — Widen Full-Text Search Trigger:**
-  - [ ] File: `backend/alembic/versions/0002_widen_fts_trigger_to_include_header.py`:
+- [x] **Step 4: Migration 0002 — Widen Full-Text Search Trigger:**
+  - [x] File: `backend/alembic/versions/0002_widen_fts_trigger_to_include_header.py`:
     - Widen `trial_chunks.search_vector` trigger to `chunk_text || ' ' || section_header`
-  - [ ] Run `uv run alembic upgrade head`
-  - [ ] Execute backfill: `UPDATE trial_chunks SET chunk_text = chunk_text;` (seconds-long, no API re-embedding)
+  - [x] Run `uv run alembic upgrade head`
+  - [x] Execute backfill: `UPDATE trial_chunks SET chunk_text = chunk_text;` (seconds-long, no API re-embedding)
 
-- [ ] **Step 5: Semantic Vector Search & Postgres Full-Text Search:**
-  - [ ] File: `backend/app/retrieval/vector_search.py`:
+- [x] **Step 5: Semantic Vector Search & Postgres Full-Text Search:**
+  - [x] File: `backend/app/retrieval/vector_search.py`:
     - `async def vector_search(session: AsyncSession, query: str, *, disease_category: str | None = None, nct_id: str | None = None, limit: int = 50) -> list[ProtocolPassage]`
     - Query embedding via `await embed_texts([query])` (reuse shared service; never hardcode model name)
     - Assert `len(vec) == settings.OPENAI_EMBEDDING_DIMENSIONS`
     - Order by `embedding <=> :vec` (cosine distance); compute `similarity = 1 - distance`
-  - [ ] File: `backend/app/retrieval/fts_search.py`:
+  - [x] File: `backend/app/retrieval/fts_search.py`:
     - `async def fts_search(session: AsyncSession, query: str, *, disease_category: str | None = None, nct_id: str | None = None, limit: int = 50) -> list[ProtocolPassage]`
     - Use `websearch_to_tsquery('english', :q)` to gracefully handle unescaped medical text
     - Order by `ts_rank_cd(search_vector, query)`
     - Return `[]` if `websearch_to_tsquery` yields an empty query (e.g. stop-words)
 
-- [ ] **Step 6: Hybrid Retrieval Orchestrator & Chat Integration:**
-  - [ ] File: `backend/app/retrieval/hybrid.py`:
+- [x] **Step 6: Hybrid Retrieval Orchestrator & Chat Integration:**
+  - [x] File: `backend/app/retrieval/hybrid.py`:
     - `async def retrieve_protocols(session: AsyncSession, query: str, *, disease_category: str | None = None, limit: int = 8, min_similarity: float | None = None) -> list[ProtocolPassage]`
     - Execute vector and FTS searches sequentially on one session (B3)
     - Fuse candidate pools via `reciprocal_rank_fusion`
     - Enrich fused chunks with single join to `clinical_trials` for `brief_title` and `last_update_posted_date`
     - Resilience: if embedding API fails, log warning and return FTS-only results rather than aborting chat turn
     - Apply `min_similarity` floor (abstention signal for protocol silence)
-  - [ ] File: `backend/app/chat/orchestrator.py`:
+  - [x] File: `backend/app/chat/orchestrator.py`:
     - Call `retrieve_protocols` inside `pre_session` (while session is open) — NOT after closing
     - Update `build_openai_messages` to accept `passages: list[ProtocolPassage]` and format numbered blocks (`[Passage 1]`, `[Passage 2]`)
     - Delete `_stub_retrieve` and verify no references to `NCT05794958` remain in the codebase
 
-- [ ] **Step 7: Retrieval Integration Test Suite & Verification:**
-  - [ ] File: `backend/tests/test_retrieval.py` (`@pytest.mark.integration`):
+- [x] **Step 7: Retrieval Integration Test Suite & Verification:**
+  - [x] File: `backend/tests/test_retrieval.py` (`@pytest.mark.integration`):
     - Target queries: KRAS G12D (NCT07659782 in top 3), washout periods, lab limit queries
     - Exclusion queries: verify returned `section_header` contains "Exclusion" and NOT "Inclusion"
     - Abstention queries: verify unrelated medical queries return `[]` or fall below similarity floor
