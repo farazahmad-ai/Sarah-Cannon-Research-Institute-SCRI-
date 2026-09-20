@@ -1,0 +1,198 @@
+/**
+ * Typed API client for the SCRI Oncology Copilot FastAPI backend.
+ *
+ * Responsibilities:
+ * - Inject the Supabase session JWT as a Bearer token on every request.
+ * - Throw a typed ApiError for non-2xx responses so callers never silently
+ *   swallow backend error messages.
+ * - Expose typed endpoint helpers (api.trials, api.chat) so components never
+ *   construct raw URL strings or manage headers themselves.
+ */
+
+import { env } from "@/lib/env";
+import { supabase } from "@/lib/supabase";
+
+// ---------------------------------------------------------------------------
+// Error type
+// ---------------------------------------------------------------------------
+
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Core fetch wrapper
+// ---------------------------------------------------------------------------
+
+/**
+ * Authenticated fetch against the FastAPI backend.
+ *
+ * Retrieves the active Supabase session JWT and attaches it as a Bearer token.
+ * Throws ApiError for non-2xx responses so callers can handle them uniformly.
+ */
+async function apiFetch(
+  path: string,
+  options: RequestInit = {}
+): Promise<Response> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+
+  // A missing token means the coordinator is not signed in. Throw early rather
+  // than sending an unauthenticated request that the backend will reject with 403.
+  if (!token) {
+    throw new ApiError(401, "No active session. Please sign in.");
+  }
+
+  const headers = new Headers(options.headers);
+  headers.set("Authorization", `Bearer ${token}`);
+  headers.set("Content-Type", "application/json");
+
+  const response = await fetch(`${env.apiBaseUrl}${path}`, {
+    ...options,
+    headers,
+  });
+
+  if (!response.ok) {
+    // Attempt to parse FastAPI's standard { detail: string } error body.
+    let detail = `HTTP ${response.status}`;
+    try {
+      const body = await response.json();
+      detail = body.detail ?? detail;
+    } catch {
+      // Response body was not JSON — fall back to the status string.
+    }
+    throw new ApiError(response.status, detail);
+  }
+
+  return response;
+}
+
+// ---------------------------------------------------------------------------
+// Typed endpoint surface
+// ---------------------------------------------------------------------------
+
+/** Metadata for a single landmark clinical trial.
+ *
+ * Field names match the real `clinical_trials` DB columns exactly (D-6).
+ * Use these names when building the Phase 5.6 /api/trials response schema.
+ */
+export interface TrialSummary {
+  nct_id: string;
+  brief_title: string;
+  /** Tumor program: 'Breast' | 'Lung' | 'Colorectal' | 'Melanoma' | 'Hematologic' */
+  category: string;
+  /** JSONB array e.g. ['PHASE2', 'PHASE3'] — display as phases.join('/') */
+  phases: string[] | null;
+  /** Overall recruitment status e.g. 'RECRUITING' */
+  status: string;
+  /** Lead sponsor organization name */
+  organization: string | null;
+  start_date: string | null;
+  primary_completion_date: string | null;
+}
+
+/** Full protocol detail returned by GET /api/trials/:nct_id */
+export interface TrialDetail extends TrialSummary {
+  official_title: string | null;
+  /** Stored as JSONB in `arms` column */
+  arms: Record<string, unknown>[] | null;
+  primary_outcomes: Record<string, unknown>[] | null;
+  last_update_posted_date: string | null;
+}
+
+/** Identity returned by GET /api/me — mirrors the backend AuthenticatedUser model. */
+export interface AuthenticatedUser {
+  id: string;
+  email: string;
+  role: string;
+}
+
+/** Summary representation of a clinical screening chat thread. */
+export interface ThreadOut {
+  id: string;
+  title: string;
+  created_at: string;
+}
+
+/** Turn within a screening chat thread. */
+export interface MessageOut {
+  id: string;
+  thread_id: string;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+}
+
+export const api = {
+  /** Fetch the backend-verified identity of the current user. Smoke-test endpoint. */
+  me: async (): Promise<AuthenticatedUser> => {
+    const res = await apiFetch("/api/me");
+    return res.json();
+  },
+
+  trials: {
+    /** List all 25 landmark trials with summary metadata. */
+    list: async (): Promise<TrialSummary[]> => {
+      const res = await apiFetch("/api/trials");
+      return res.json();
+    },
+
+    /** Fetch full protocol detail for a single trial by NCT ID. */
+    get: async (nctId: string): Promise<TrialDetail> => {
+      const res = await apiFetch(`/api/trials/${nctId}`);
+      return res.json();
+    },
+  },
+
+  chat: {
+    /**
+     * Open a streaming SSE connection to the chat endpoint.
+     *
+     * Returns the raw Response so the caller (useChat / Vercel AI SDK) can
+     * consume the ReadableStream directly — we do not parse it here.
+     */
+    stream: async (body: {
+      thread_id: string | null;
+      message: string;
+    }): Promise<Response> => {
+      return apiFetch("/api/chat/stream", {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+    },
+
+    /** List all chat threads for the current user. */
+    threads: async (): Promise<ThreadOut[]> => {
+      const res = await apiFetch("/api/chat/threads");
+      return res.json();
+    },
+
+    /** Create a new screening thread. */
+    createThread: async (title?: string): Promise<ThreadOut> => {
+      const res = await apiFetch("/api/chat/threads", {
+        method: "POST",
+        body: JSON.stringify(title ? { title } : {}),
+      });
+      return res.json();
+    },
+
+    /** Delete a screening thread by UUID. */
+    deleteThread: async (threadId: string): Promise<void> => {
+      await apiFetch(`/api/chat/threads/${threadId}`, {
+        method: "DELETE",
+      });
+    },
+
+    /** Fetch message history for a thread. */
+    messages: async (threadId: string): Promise<MessageOut[]> => {
+      const res = await apiFetch(`/api/chat/threads/${threadId}/messages`);
+      return res.json();
+    },
+  },
+};
