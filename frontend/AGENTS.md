@@ -11,7 +11,7 @@ This is the React SPA for **Sarah Cannon Research Institute (SCRI) Oncology Copi
 - **UI Primitives:** shadcn/ui. Add components via `pnpm dlx shadcn@latest add <name>` — do not hand-roll what shadcn already provides.
 - **Routing:** React Router.
 - **Auth:** `@supabase/supabase-js` (institutional email only — no third-party Google/social OAuth).
-- **Streaming Client:** Vercel AI SDK React primitives (`useChat`) connected to FastAPI's SSE stream.
+- **Streaming Client:** Native fetch SSE with `ReadableStream` — hand-parsed Vercel AI data-stream frames in `src/lib/useChatStream.ts`. `@ai-sdk/react` was removed (D-7); `useChat` was never used.
 
 ---
 
