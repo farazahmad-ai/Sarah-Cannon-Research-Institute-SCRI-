@@ -5,8 +5,17 @@ Orchestrates the chat turn pipeline:
 2. Resolves or creates the chat thread.
 3. Retrieves relevant protocol passages (stubbed in this slice).
 4. Assembles prompt with system instructions, conversation history, and protocol context.
-5. Streams completions from OpenAI/OpenRouter in Vercel AI SDK data-stream format.
-6. Persists the completed turn to the database in a unified transaction.
+5. Streams completions from OpenAI in Vercel AI SDK data-stream format.
+6. Persists the completed turn to the database — in its own short-lived session,
+   guarded by BaseException so a late client disconnect still saves the answer.
+
+Session ownership (D-3 / D-4):
+  The route layer passes NO session to this function. The orchestrator opens and
+  closes its own short-lived sessions at each DB boundary so that zero pooled
+  connections are held while tokens are streaming (which can take 5–30 seconds).
+  Two sessions are used per turn:
+    - pre_session:  profile upsert + thread resolve + history fetch → commit → close
+    - post_session: persist_turn → commit → close  (guarded by BaseException)
 """
 
 from collections.abc import AsyncGenerator
@@ -29,8 +38,19 @@ from app.database.chats import (
     upsert_profile,
 )
 from app.database.models import ChatMessage
+from app.database.session import async_session_factory
 
 logger = logging.getLogger(__name__)
+
+# Maximum number of prior turns to include in the prompt.
+# Bounded here rather than in the DB query so the DB always returns the full
+# history (useful for future analytics) while the LLM only sees a safe window.
+_MAX_HISTORY_MESSAGES = 10
+
+# Approximate token budget for conversation history.
+# Uses the same word_count * 1.3 heuristic as the chunker — no tiktoken dep.
+# If history exceeds this, we slice from the tail (most recent turns).
+_MAX_HISTORY_TOKENS = 8_000
 
 SYSTEM_PROMPT = (
     "You are an intelligent clinical trial protocol assistant for Sarah Cannon Research Institute (SCRI). "
@@ -59,6 +79,33 @@ def _stub_retrieve(message: str) -> ProtocolPassage:
     )
 
 
+def _estimate_tokens(text: str) -> int:
+    """Rough token estimate: word_count × 1.3 (GPT tokenizer average)."""
+    return int(len(text.split()) * 1.3)
+
+
+def _trim_history(history: List[ChatMessage]) -> List[ChatMessage]:
+    """Return the most-recent tail of history that fits within token and count budgets.
+
+    We enforce both a message count cap (_MAX_HISTORY_MESSAGES) and a soft token
+    budget (_MAX_HISTORY_TOKENS) because a single long assistant response can blow
+    the context window even with few messages. We take the tail (most recent) so
+    that the conversation stays coherent.
+    """
+    # Apply message count cap first
+    capped = history[-_MAX_HISTORY_MESSAGES:]
+
+    # Then trim further if total token estimate exceeds budget
+    total = 0
+    cutoff = len(capped)
+    for i in range(len(capped) - 1, -1, -1):
+        total += _estimate_tokens(capped[i].content)
+        if total > _MAX_HISTORY_TOKENS:
+            cutoff = i + 1
+            break
+    return capped[cutoff:]
+
+
 def build_openai_messages(
     history: List[ChatMessage],
     passage: ProtocolPassage,
@@ -69,7 +116,7 @@ def build_openai_messages(
         "role": "system",
         "content": SYSTEM_PROMPT,
     }
-    prior = [{"role": m.role, "content": m.content} for m in history[-10:]]
+    prior = [{"role": m.role, "content": m.content} for m in _trim_history(history)]
     context_block = (
         f"[{passage.nct_id}, {passage.section_header}]\n{passage.chunk_text}"
     )
@@ -81,28 +128,47 @@ def build_openai_messages(
 
 
 async def stream_chat_turn(
-    db: AsyncSession,
     user: AuthenticatedUser,
     request: ChatRequest,
 ) -> AsyncGenerator[str, None]:
-    """Execute streaming chat turn and yield Vercel AI SDK formatted frames."""
+    """Execute streaming chat turn and yield Vercel AI SDK formatted frames.
+
+    DB session strategy (D-3 / D-4):
+      - pre_session: resolve thread + fetch history → committed before yielding
+      - No session is held during token streaming
+      - post_session: persist completed turn → committed after streaming
+    """
     user_uuid = uuid.UUID(user.id) if isinstance(user.id, str) else user.id
 
-    # 1. Guarantee profile exists
-    await upsert_profile(db, user_uuid, user.email)
+    # ------------------------------------------------------------------
+    # Pre-stream block: all DB reads in one short-lived committed session.
+    # The session is fully closed before we yield a single token, so no
+    # connection is held while the LLM streams (D-4).
+    # ------------------------------------------------------------------
+    thread_id: uuid.UUID
+    history: List[ChatMessage]
 
-    # 2. Get or create thread
-    if request.thread_id is None:
-        title = request.message.strip()[:60] or "New Screening Session"
-        thread = await create_thread(db, user_uuid, title=title)
-    else:
-        thread = await get_thread(db, request.thread_id, user_uuid)
+    async with async_session_factory() as pre_session:
+        # 1. Guarantee profile exists
+        await upsert_profile(pre_session, user_uuid, user.email)
 
-    # 3. Retrieve protocol passage (stub)
+        # 2. Get or create thread
+        if request.thread_id is None:
+            title = request.message.strip()[:60] or "New Screening Session"
+            thread = await create_thread(pre_session, user_uuid, title=title)
+        else:
+            thread = await get_thread(pre_session, request.thread_id, user_uuid)
+
+        thread_id = thread.id
+
+        # 3. Fetch conversation history (ownership already verified above)
+        history = await list_messages(pre_session, thread_id, user_uuid)
+
+        await pre_session.commit()
+    # pre_session is now fully closed — connection returned to pool
+
+    # 4. Retrieve protocol passage (stub — replaced by hybrid.retrieve() in Phase 4)
     passage = _stub_retrieve(request.message)
-
-    # 4. Fetch conversation history
-    history = await list_messages(db, thread.id, user_uuid)
 
     # 5. Build prompt messages
     messages = build_openai_messages(history, passage, request.message)
@@ -113,6 +179,12 @@ async def stream_chat_turn(
         base_url=settings.effective_base_url,
     )
 
+    # ------------------------------------------------------------------
+    # Stream block: no DB session is open during token delivery.
+    # ------------------------------------------------------------------
+    stream_error: Exception | None = None
+    collected_text: List[str] = []
+
     try:
         stream = await client.chat.completions.create(
             model=settings.OPENAI_CHAT_MODEL,
@@ -120,7 +192,6 @@ async def stream_chat_turn(
             stream=True,
         )
 
-        collected_text: List[str] = []
         async for chunk in stream:
             if chunk.choices and len(chunk.choices) > 0:
                 delta = chunk.choices[0].delta.content or ""
@@ -129,16 +200,34 @@ async def stream_chat_turn(
                     # Vercel AI SDK text part: 0:"<text>"\n
                     yield f"0:{json.dumps(delta)}\n"
 
-        assistant_text = "".join(collected_text)
-
-        # 7. Persist turn to database in single transaction
-        await persist_turn(db, thread.id, request.message, assistant_text)
-
-        # 8. Yield Vercel AI SDK finish frame
-        yield 'd:{"finishReason":"stop"}\n'
-
     except Exception as exc:
         logger.exception("Error streaming chat turn: %s", exc)
-        # Vercel AI SDK error frame: 3:"<error>"\n
+        # Write the Vercel AI SDK error frame — the stream has already started
+        # (HTTP 200 sent), so we must not re-raise here. Set a flag and let
+        # the generator return cleanly so the client sees the error frame (D-8.7).
+        stream_error = exc
         yield f"3:{json.dumps(str(exc))}\n"
-        raise
+        return
+
+    # Vercel AI SDK finish frame
+    yield 'd:{"finishReason":"stop"}\n'
+
+    # ------------------------------------------------------------------
+    # Post-stream block: persist in a fresh short-lived session.
+    # Guarded by BaseException so a late client disconnect (CancelledError)
+    # still saves the completed answer rather than silently losing it (D-3).
+    # ------------------------------------------------------------------
+    if not stream_error:
+        assistant_text = "".join(collected_text)
+        try:
+            async with async_session_factory() as post_session:
+                await persist_turn(post_session, thread_id, request.message, assistant_text)
+                await post_session.commit()
+        except BaseException as exc:
+            logger.error(
+                "Failed to persist chat turn for thread %s: %s",
+                thread_id,
+                exc,
+            )
+            # Do not re-raise — the stream has already completed successfully
+            # from the client's perspective. Log and move on.

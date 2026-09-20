@@ -21,7 +21,6 @@ from app.chat.orchestrator import stream_chat_turn
 from app.database.chats import (
     create_thread,
     delete_thread,
-    get_thread,
     list_messages,
     list_threads,
     upsert_profile,
@@ -133,29 +132,17 @@ async def get_thread_messages(
 )
 async def chat_stream(
     request: ChatRequest,
-    db: AsyncSession = Depends(get_db_session),
     user: AuthenticatedUser = Depends(get_current_user),
 ) -> StreamingResponse:
-    """Stream token deltas in Vercel AI SDK data-stream format."""
-    user_uuid = uuid.UUID(user.id) if isinstance(user.id, str) else user.id
+    """Stream token deltas in Vercel AI SDK data-stream format.
 
-    # Pre-validate thread existence and ownership before streaming
-    if request.thread_id is not None:
-        try:
-            await get_thread(db, request.thread_id, user_uuid)
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=str(exc),
-            ) from exc
-        except PermissionError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=str(exc),
-            ) from exc
-
+    No DB session is injected here (D-4). The orchestrator opens and closes
+    its own short-lived sessions so that zero pooled connections are held
+    during the SSE stream. Thread ownership is verified inside the orchestrator
+    before any tokens are yielded.
+    """
     return StreamingResponse(
-        stream_chat_turn(db, user, request),
+        stream_chat_turn(user, request),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
