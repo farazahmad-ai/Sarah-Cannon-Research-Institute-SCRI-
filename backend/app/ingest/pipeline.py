@@ -169,7 +169,7 @@ def _print_dry_run(trial: ParsedTrial, chunks: list[ChunkPayload]) -> None:
 # Database upsert
 # ---------------------------------------------------------------------------
 
-async def _upsert_trial(session, study: dict, trial: ParsedTrial) -> None:
+async def _upsert_trial(session, trial: ParsedTrial) -> None:
     """Upsert a ClinicalTrial row. ON CONFLICT updates existing rows."""
     trial_data = {
         "nct_id": trial.nct_id,
@@ -288,7 +288,7 @@ async def _process_trial(study: dict, args: argparse.Namespace) -> dict:
     # Step 4: Upsert into Supabase
     async with async_session_factory() as session:
         try:
-            await _upsert_trial(session, study, trial)
+            await _upsert_trial(session, trial)
             await _replace_chunks(session, nct_id, chunks, vectors)
             await session.commit()
             embed_status = "no-embed" if args.skip_embed else "embedded"
@@ -322,7 +322,13 @@ async def main() -> None:
     results: list[dict] = []
     for i, study in enumerate(selected, start=1):
         logger.info("--- [%d/%d] Processing %s ---", i, len(selected), study["nct_id"])
-        result = await _process_trial(study, args)
+        try:
+            result = await _process_trial(study, args)
+        except Exception:
+            # Log the error but continue the batch so one bad trial doesn't
+            # abort ingestion of the remaining 24 (D-8.3).
+            logger.exception("Unhandled error processing %s -- skipping", study["nct_id"])
+            result = {"nct_id": study["nct_id"], "status": "error", "chunks": 0}
         results.append(result)
 
     # Final summary report
@@ -331,7 +337,7 @@ async def main() -> None:
     print("=" * 50)
     total_chunks = 0
     for r in results:
-        status_icon = "OK" if r["status"] in ("ok", "dry-run") else ("REFUSE" if r["status"] == "refused" else "SKIP")
+        status_icon = "OK" if r["status"] in ("ok", "dry-run") else ("REFUSE" if r["status"] == "refused" else ("ERR" if r["status"] == "error" else "SKIP"))
         print(f"  [{status_icon}]  {r['nct_id']}  --  {r['chunks']} chunks  ({r['status']})")
         total_chunks += r["chunks"]
     print(f"\nTotal: {len(results)} trials  |  {total_chunks} chunks")

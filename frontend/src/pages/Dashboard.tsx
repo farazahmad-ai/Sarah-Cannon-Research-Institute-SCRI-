@@ -1,9 +1,11 @@
 /**
  * Auth smoke-test dashboard — confirms the full JWT auth chain is working.
  *
- * This is a temporary verification screen, not the final clinical UI.
- * It calls GET /api/me on mount and displays the backend-verified identity.
- * Replace with the real Dashboard (Phase 6.6) once auth is confirmed.
+ * STATUS: Temporary verification screen (D-8.8).
+ * - Not wired to any React Router route — import it manually to use it.
+ * - Kept because it's a fast way to verify GET /api/me during development.
+ * - TODO(Phase 6.6): Replace with the real clinical trial browser dashboard.
+ *   When Phase 6.6 ships, delete this file and the import below.
  */
 
 import { useEffect, useState } from "react";
