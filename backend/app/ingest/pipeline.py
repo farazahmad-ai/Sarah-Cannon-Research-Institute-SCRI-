@@ -30,7 +30,7 @@ import logging
 import sys
 from pathlib import Path
 
-from sqlalchemy import delete
+from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 # Pipeline must be run from the backend/ directory so relative imports resolve
@@ -90,6 +90,15 @@ def _parse_args() -> argparse.Namespace:
         "--skip-embed",
         action="store_true",
         help="Write chunks to DB but skip embedding API calls (schema validation mode).",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help=(
+            "Allow --skip-embed to overwrite trials that already have embeddings. "
+            "Without this flag, --skip-embed refuses to run against an already-embedded "
+            "trial to prevent silent destruction of the vector index."
+        ),
     )
     return parser.parse_args()
 
@@ -248,6 +257,27 @@ async def _process_trial(study: dict, args: argparse.Namespace) -> dict:
         return {"nct_id": nct_id, "status": "dry-run", "chunks": len(chunks)}
 
     # Step 3: Generate embeddings (unless --skip-embed)
+    #
+    # Safety guard (D-5): --skip-embed deletes existing chunks and re-inserts them
+    # with embedding=NULL, which silently destroys the vector index for this trial.
+    # Refuse if the trial already has non-null embeddings, unless --force is set.
+    if args.skip_embed and not args.force:
+        async with async_session_factory() as guard_session:
+            existing_count: int = await guard_session.scalar(
+                select(func.count()).where(
+                    TrialChunk.nct_id == nct_id,
+                    TrialChunk.embedding.is_not(None),
+                )
+            ) or 0
+        if existing_count > 0:
+            logger.error(
+                "%s  --skip-embed refused: %d existing embedding(s) would be destroyed. "
+                "Pass --force to override.",
+                nct_id,
+                existing_count,
+            )
+            return {"nct_id": nct_id, "status": "refused", "chunks": 0}
+
     vectors: list[list[float]] | None = None
     if not args.skip_embed:
         logger.info("%s  Generating embeddings for %d chunks...", nct_id, len(chunks))
@@ -301,7 +331,7 @@ async def main() -> None:
     print("=" * 50)
     total_chunks = 0
     for r in results:
-        status_icon = "OK" if r["status"] in ("ok", "dry-run") else "SKIP"
+        status_icon = "OK" if r["status"] in ("ok", "dry-run") else ("REFUSE" if r["status"] == "refused" else "SKIP")
         print(f"  [{status_icon}]  {r['nct_id']}  --  {r['chunks']} chunks  ({r['status']})")
         total_chunks += r["chunks"]
     print(f"\nTotal: {len(results)} trials  |  {total_chunks} chunks")
