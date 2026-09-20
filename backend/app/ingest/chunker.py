@@ -27,9 +27,10 @@ from pathlib import Path
 from typing import Any
 
 # ---------------------------------------------------------------------------
-# Token ceiling -- soft limit per chunk (never break a criterion to meet it)
+# Token ceiling note: a soft 600-token limit was originally planned but never
+# enforced (splitting a criterion mid-clause would break citation integrity).
+# Oversized chunks are logged as warnings during ingestion instead.
 # ---------------------------------------------------------------------------
-MAX_TOKENS_SOFT = 600
 
 
 @dataclass
@@ -230,18 +231,25 @@ def _make_chunk(
 def _split_eligibility(raw: str) -> tuple[list[str], list[str]]:
     """Split the raw eligibilityCriteria blob into inclusion and exclusion lists.
 
-    The ClinicalTrials.gov format uses:
-      Inclusion Criteria:\n\n* bullet\n* bullet\n\nExclusion Criteria:\n\n* bullet
-    Each * bullet may span multiple lines (sub-bullets use indented *).
+    ClinicalTrials.gov protocols use several heading variants that all mean the
+    same thing -- the regex must tolerate all of them:
 
-    Strategy:
-      1. Find the boundary between "Inclusion Criteria:" and "Exclusion Criteria:".
-      2. Within each half, split on top-level "\n* " (not sub-bullets).
-      3. Strip and deduplicate blank entries.
+      Standard:   "Exclusion Criteria:"   (original assumption)
+      With prefix: "Key Exclusion Criteria:"  (breaks \\n-anchor + literal match)
+      No colon:   "Exclusion Criteria"    (colon optional)
+      Casing:     any mix of upper/lower
+
+    Fix (D-1): use MULTILINE so ^ matches any line start, make the "Key" prefix
+    optional, and make the trailing colon optional.
     """
     raw = raw.replace("\r\n", "\n").replace("\r", "\n")
 
-    exc_pattern = re.compile(r"\nexclusion criteria\s*:", re.IGNORECASE)
+    # Matches the exclusion heading at the start of any line, with or without
+    # a "Key" prefix and with or without a trailing colon.
+    exc_pattern = re.compile(
+        r"^\s*(?:key\s+)?exclusion\s+criteria\s*:?\s*$",
+        re.IGNORECASE | re.MULTILINE,
+    )
     match = exc_pattern.search(raw)
 
     if match:
@@ -251,8 +259,11 @@ def _split_eligibility(raw: str) -> tuple[list[str], list[str]]:
         inclusion_raw = raw
         exclusion_raw = ""
 
-    # Strip the "Inclusion Criteria:" header from the inclusion block
-    inc_header_pattern = re.compile(r"^inclusion criteria\s*:", re.IGNORECASE)
+    # Strip the "Inclusion Criteria:" header (same variant-tolerant pattern)
+    inc_header_pattern = re.compile(
+        r"^\s*(?:key\s+)?inclusion\s+criteria\s*:?\s*$",
+        re.IGNORECASE | re.MULTILINE,
+    )
     inclusion_raw = inc_header_pattern.sub("", inclusion_raw, count=1).strip()
 
     return _parse_bullets(inclusion_raw), _parse_bullets(exclusion_raw)
@@ -261,14 +272,21 @@ def _split_eligibility(raw: str) -> tuple[list[str], list[str]]:
 def _parse_bullets(text: str) -> list[str]:
     """Extract top-level bullet items from a criteria block.
 
-    Bullets start with "* " on a new line. Sub-bullets (indented "  * ")
-    are kept attached to their parent criterion -- we never break a criterion
-    from its sub-bullets because they carry qualifying conditions.
+    Handles two list styles used by ClinicalTrials.gov protocols:
+      * Star bullets:    "* criterion text"
+      * Numbered lists:  "1. criterion text" or "1) criterion text"
 
-    Example input:
-      * Must have EGFR confirmed mutation
-        * Note: tested within 6 months
-      * Prior therapy washout >= 14 days
+    Sub-bullets (indented "  * ") are kept attached to their parent criterion
+    because they carry qualifying conditions (e.g. sub-thresholds, footnotes).
+    We never break a criterion from its sub-bullets.
+
+    Fix (D-2): the original splitter only recognised "* " bullets, causing five
+    protocols that use numbered lists to collapse into a single oversized chunk.
+
+    Example input (numbered):
+      1. Must have EGFR confirmed mutation
+         * Note: tested within 6 months
+      2. Prior therapy washout >= 14 days
 
     Returns two items:
       ["Must have EGFR confirmed mutation\n  * Note: tested within 6 months",
@@ -277,13 +295,14 @@ def _parse_bullets(text: str) -> list[str]:
     if not text.strip():
         return []
 
-    # Split only on newlines followed immediately by "* " (top-level bullets)
-    parts = re.split(r"\n(?=\* )", text.strip())
+    # Match top-level bullets: "* " OR a number followed by "." or ")" and a space.
+    # The lookahead ensures we only split at line-start markers, not mid-text.
+    parts = re.split(r"\n(?=(?:\* |\d+[.)\s]\s*))", text.strip())
     bullets: list[str] = []
 
     for part in parts:
-        # Remove the leading "* " marker
-        cleaned = re.sub(r"^\* ", "", part.strip())
+        # Strip the leading bullet marker ("* ", "1. ", "2) ", etc.)
+        cleaned = re.sub(r"^(?:\* |\d+[.)\s]\s+)", "", part.strip())
         if cleaned:
             bullets.append(_clean_text(cleaned))
 
