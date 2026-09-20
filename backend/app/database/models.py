@@ -80,7 +80,7 @@ class ClinicalTrial(Base, TimestampMixin):
     """
     __tablename__ = "clinical_trials"
 
-    # National Clinical Trial identifier (e.g. 'NCT05794958')
+    # National Clinical Trial identifier (e.g. 'NCT07659782')
     nct_id: Mapped[str] = mapped_column(
         String(32),
         primary_key=True,

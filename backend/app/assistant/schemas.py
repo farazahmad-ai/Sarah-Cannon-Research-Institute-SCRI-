@@ -8,7 +8,7 @@ Defines schemas for:
 - ProtocolPassage: Grounded trial protocol passage chunk.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 import uuid
 
@@ -64,6 +64,26 @@ class MessageOut(BaseModel):
 class ProtocolPassage(BaseModel):
     """Protocol passage chunk representation matching retrieval output."""
 
-    nct_id: str
-    section_header: str
-    chunk_text: str
+    chunk_id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        description="Chunk UUID matching trial_chunks.id (RRF dedup key & MessageCitation FK)",
+    )
+    nct_id: str = Field(description="National Clinical Trial identifier, e.g. NCT07659782")
+    section_type: str = Field(
+        default="ELIGIBILITY_EXCLUSION",
+        description="Section category, e.g. ELIGIBILITY_EXCLUSION",
+    )
+    section_header: str = Field(description="Exact section title or criterion label")
+    chunk_text: str = Field(description="Verbatim protocol passage text")
+    similarity: Optional[float] = Field(
+        default=None,
+        description="Raw cosine similarity (1 - cosine_distance) for abstention filtering",
+    )
+    last_update_posted_date: Optional[date] = Field(
+        default=None,
+        description="Protocol amendment date for evidence verification",
+    )
+    brief_title: Optional[str] = Field(
+        default=None,
+        description="Brief clinical trial title for display",
+    )

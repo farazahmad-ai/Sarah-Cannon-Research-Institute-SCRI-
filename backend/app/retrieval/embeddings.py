@@ -48,18 +48,17 @@ async def embed_texts(texts: list[str]) -> list[list[float]]:
     if not texts:
         return []
 
-    client = AsyncOpenAI(
-        api_key=settings.effective_api_key,
-        base_url=settings.effective_base_url,
-    )
-
     all_vectors: list[list[float]] = []
     total_batches = (len(texts) + _BATCH_SIZE - 1) // _BATCH_SIZE
 
-    for batch_idx in range(total_batches):
-        batch = texts[batch_idx * _BATCH_SIZE : (batch_idx + 1) * _BATCH_SIZE]
-        vectors = await _embed_batch_with_retry(client, batch, batch_idx, total_batches)
-        all_vectors.extend(vectors)
+    async with AsyncOpenAI(
+        api_key=settings.effective_api_key,
+        base_url=settings.effective_base_url,
+    ) as client:
+        for batch_idx in range(total_batches):
+            batch = texts[batch_idx * _BATCH_SIZE : (batch_idx + 1) * _BATCH_SIZE]
+            vectors = await _embed_batch_with_retry(client, batch, batch_idx, total_batches)
+            all_vectors.extend(vectors)
 
     # Sanity check: verify embedding dimensions match pgvector column definition
     if all_vectors and len(all_vectors[0]) != settings.OPENAI_EMBEDDING_DIMENSIONS:

@@ -39,6 +39,7 @@ from app.database.chats import (
 )
 from app.database.models import ChatMessage
 from app.database.session import async_session_factory
+from app.retrieval.hybrid import retrieve_protocols
 
 logger = logging.getLogger(__name__)
 
@@ -47,36 +48,20 @@ logger = logging.getLogger(__name__)
 # history (useful for future analytics) while the LLM only sees a safe window.
 _MAX_HISTORY_MESSAGES = 10
 
-# Approximate token budget for conversation history.
-# Uses the same word_count * 1.3 heuristic as the chunker — no tiktoken dep.
-# If history exceeds this, we slice from the tail (most recent turns).
-_MAX_HISTORY_TOKENS = 8_000
+# Soft token ceiling for conversation history (~8 000 tokens ≈ 6 000 words)
+_MAX_HISTORY_TOKENS = 8000
 
 SYSTEM_PROMPT = (
-    "You are an intelligent clinical trial protocol assistant for Sarah Cannon Research Institute (SCRI). "
-    "Your role is to assist clinical research coordinators in screening cancer patients against trial protocols. "
-    "Answer questions strictly and solely using the provided protocol context. "
-    "Always cite the protocol passage in bracketed format (e.g. [NCTxxxxxxx, Section Title]). "
+    "You are an expert oncology clinical trial assistant for Sarah Cannon Research Institute (SCRI). "
+    "Your mission is to provide accurate, grounded answers to clinical research coordinators "
+    "and investigators evaluating patient eligibility for cancer clinical trials.\n\n"
+    "CRITICAL RULES:\n"
+    "1. ABSOLUTE GROUNDING: Every factual claim must cite a specific protocol section using bracket notation: "
+    "[NCT ID, Section Header] (e.g. [NCT07659782, Eligibility: Exclusion Criterion #4]).\n"
+    "2. ZERO HALLUCINATION: Never fabricate eligibility criteria, lab thresholds, or washout periods. "
     "If the provided protocol context does not contain the answer, explicitly state: 'The protocol does not state [X].' "
     "Never guess, extrapolate, or generalize from other medical literature."
 )
-
-
-def _stub_retrieve(message: str) -> ProtocolPassage:
-    """Hardcoded single passage stub.
-    
-    Replaced by hybrid.retrieve() in Phase 4. Returns a realistic clinical
-    exclusion criterion so the assistant demonstrates grounded citation behavior.
-    """
-    return ProtocolPassage(
-        nct_id="NCT05794958",
-        section_header="Eligibility: Exclusion Criterion #7",
-        chunk_text=(
-            "Prior anti-cancer therapy within 4 weeks before the first "
-            "dose of study treatment, or 5 half-lives of the drug, "
-            "whichever is shorter."
-        ),
-    )
 
 
 def _estimate_tokens(text: str) -> int:
@@ -108,21 +93,33 @@ def _trim_history(history: List[ChatMessage]) -> List[ChatMessage]:
 
 def build_openai_messages(
     history: List[ChatMessage],
-    passage: ProtocolPassage,
+    passages: List[ProtocolPassage],
     user_message: str,
 ) -> List[Dict[str, str]]:
-    """Assemble the OpenAI messages array for chat completion."""
+    """Assemble the OpenAI messages array for chat completion with grounded passages."""
     system = {
         "role": "system",
         "content": SYSTEM_PROMPT,
     }
     prior = [{"role": m.role, "content": m.content} for m in _trim_history(history)]
-    context_block = (
-        f"[{passage.nct_id}, {passage.section_header}]\n{passage.chunk_text}"
-    )
+
+    if passages:
+        formatted_passages = []
+        for idx, p in enumerate(passages, start=1):
+            formatted_passages.append(
+                f"[Passage {idx} | {p.nct_id}, {p.section_header}]\n{p.chunk_text}"
+            )
+        context_block = "\n\n".join(formatted_passages)
+        user_content = f"Protocol Context:\n{context_block}\n\nQuestion: {user_message}"
+    else:
+        user_content = (
+            "Protocol Context: No matching protocol passages retrieved for this query.\n\n"
+            f"Question: {user_message}"
+        )
+
     user = {
         "role": "user",
-        "content": f"Protocol Context:\n{context_block}\n\nQuestion: {user_message}",
+        "content": user_content,
     }
     return [system, *prior, user]
 
@@ -134,7 +131,7 @@ async def stream_chat_turn(
     """Execute streaming chat turn and yield Vercel AI SDK formatted frames.
 
     DB session strategy (D-3 / D-4):
-      - pre_session: resolve thread + fetch history → committed before yielding
+      - pre_session: resolve thread + fetch history + hybrid retrieval → committed before yielding
       - No session is held during token streaming
       - post_session: persist completed turn → committed after streaming
     """
@@ -147,6 +144,7 @@ async def stream_chat_turn(
     # ------------------------------------------------------------------
     thread_id: uuid.UUID
     history: List[ChatMessage]
+    passages: List[ProtocolPassage]
 
     async with async_session_factory() as pre_session:
         # 1. Guarantee profile exists
@@ -164,14 +162,14 @@ async def stream_chat_turn(
         # 3. Fetch conversation history (ownership already verified above)
         history = await list_messages(pre_session, thread_id, user_uuid)
 
+        # 4. Execute hybrid retrieval inside pre_session before commit/close
+        passages = await retrieve_protocols(pre_session, request.message)
+
         await pre_session.commit()
     # pre_session is now fully closed — connection returned to pool
 
-    # 4. Retrieve protocol passage (stub — replaced by hybrid.retrieve() in Phase 4)
-    passage = _stub_retrieve(request.message)
-
-    # 5. Build prompt messages
-    messages = build_openai_messages(history, passage, request.message)
+    # 5. Build prompt messages with grounded passages
+    messages = build_openai_messages(history, passages, request.message)
 
     # 6. Initialize async OpenAI client
     client = openai.AsyncOpenAI(
