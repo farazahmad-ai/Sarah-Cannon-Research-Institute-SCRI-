@@ -202,32 +202,32 @@ async def stream_chat_turn(
 
     except Exception as exc:
         logger.exception("Error streaming chat turn: %s", exc)
-        # Write the Vercel AI SDK error frame — the stream has already started
-        # (HTTP 200 sent), so we must not re-raise here. Set a flag and let
-        # the generator return cleanly so the client sees the error frame (D-8.7).
         stream_error = exc
         yield f"3:{json.dumps(str(exc))}\n"
-        return
 
-    # Vercel AI SDK finish frame
-    yield 'd:{"finishReason":"stop"}\n'
+    if not stream_error:
+        # Vercel AI SDK finish frame
+        yield 'd:{"finishReason":"stop"}\n'
 
     # ------------------------------------------------------------------
     # Post-stream block: persist in a fresh short-lived session.
     # Guarded by BaseException so a late client disconnect (CancelledError)
     # still saves the completed answer rather than silently losing it (D-3).
+    # Persists even on stream_error (R-6) so the coordinator's question is
+    # not lost on reload.
     # ------------------------------------------------------------------
-    if not stream_error:
-        assistant_text = "".join(collected_text)
-        try:
-            async with async_session_factory() as post_session:
-                await persist_turn(post_session, thread_id, request.message, assistant_text)
-                await post_session.commit()
-        except BaseException as exc:
-            logger.error(
-                "Failed to persist chat turn for thread %s: %s",
-                thread_id,
-                exc,
-            )
-            # Do not re-raise — the stream has already completed successfully
-            # from the client's perspective. Log and move on.
+    assistant_text = "".join(collected_text)
+    if stream_error and not assistant_text:
+        assistant_text = f"[Response interrupted: {stream_error}]"
+
+    try:
+        async with async_session_factory() as post_session:
+            await persist_turn(post_session, thread_id, request.message, assistant_text)
+            await post_session.commit()
+    except BaseException as exc:
+        logger.error(
+            "Failed to persist chat turn for thread %s: %s",
+            thread_id,
+            exc,
+        )
+        # Do not re-raise — log and move on.

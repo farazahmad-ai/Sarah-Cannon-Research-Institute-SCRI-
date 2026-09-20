@@ -105,7 +105,7 @@ Alembic migrations track and manage:
 - Generated `tsvector` columns for exact medical keyword matching (e.g. *KRAS G12D*, *EGFR Exon 20*, *ANC*)
 - HNSW indexes (`vector_cosine_ops`, `m=16, ef_construction=64`) and GIN indexes on `tsvector`
 - Chat threads (`chat_threads`), messages (`chat_messages`), and citations (`message_citations`)
-- Row-Level Security (RLS) policies and user profiles (`profiles`)
+- User profiles (`profiles`) table (RLS policies planned for future production hardening)
 
 > [!IMPORTANT]
 > Always use the **direct/session database connection string (port 5432)** for Alembic. Do **NOT** use the transaction pooler connection string (port 6543) for running migrations, as migrations require session-level DDL locks.
@@ -179,7 +179,7 @@ Always review the generated migration script. Add explicit operations for Supaba
   ON trial_chunks 
   USING gin (search_vector);
   ```
-- Row Level Security (RLS) enablement and tenant policies
+- Row Level Security (RLS) enablement and tenant policies (planned for future production hardening; initial schema uses application-level tenant isolation)
 
 #### Apply migrations:
 

@@ -65,6 +65,7 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
   - Verified live connection to OpenRouter embeddings and chat completions
 
 - [x] **2.3 Database Engine, Session & Supabase Platform Client:**
+  *Audit fix: `session.py` catches `BaseException` to safely rollback on client disconnect.*
   - [x] File: `backend/app/database/__init__.py`
   - [x] File: `backend/app/database/session.py`:
     - Configure SQLAlchemy 2.0 `create_async_engine` using `settings.async_database_url`
@@ -81,7 +82,7 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
 - [x] **2.4 SQLAlchemy Declarative Models:**
   - [x] File: `backend/app/database/models.py`:
     - `Profile` model: User identity linked to Supabase auth (`id`, `email`, `full_name`, `role`, timestamps)
-    - `ClinicalTrial` model: Landmark trial metadata (`nct_id` PK, `brief_title`, `official_title`, `brief_summary`, `disease_category`, `phase`, `study_type`, `lead_sponsor`, `overall_status`, `start_date`, `primary_completion_date`, `last_update_posted_date`, `study_arms`, `primary_outcomes`, `secondary_outcomes`)
+    - `ClinicalTrial` model: Landmark trial metadata (`nct_id` PK, `category`, `brief_title`, `official_title`, `organization`, `status`, `start_date`, `primary_completion_date`, `last_update_posted_date`, `phases`, `conditions`, `arms`, `primary_outcomes`)
     - `TrialChunk` model: Structured protocol chunks (`id` UUID PK, `nct_id` FK, `section_type`, `section_title`, `chunk_index`, `chunk_text`, `embedding` `Vector(1536)`, `search_vector` `TSVector`, `token_count`, `metadata`)
     - `ChatThread` model: Chat conversation threads (`id` UUID PK, `user_id` FK, `title`, timestamps)
     - `ChatMessage` model: Chat turn messages (`id` UUID PK, `thread_id` FK, `role`, `content`, `metadata`, timestamps)
@@ -105,6 +106,7 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
 ## Phase 3: Ingestion, Chunking & Embedding Pipeline (in `backend/app/ingest`) (Completed ✅)
 
 - [x] **3.1 Section-Aware Protocol Chunker:**
+  *Audit fix: regex supports "Key Exclusion/Inclusion" & no-colon headers; added numbered list parsing; removed unused token soft cap.*
   - [x] File: `backend/app/ingest/__init__.py`
   - [x] File: `backend/app/ingest/chunker.py`:
     - Custom clinical boundary chunker — pure Python, zero external chunking libraries
@@ -113,7 +115,7 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
     - Sub-bullets (qualifying conditions) kept attached to parent criterion — never split mid-criterion
     - Context prefix `[NCT ID | Phase | Category]` prepended to embed_text for identity-aware vectors
     - Token estimate via word_count × 1.3 heuristic (no tiktoken dependency)
-    - Produces: BRIEF_SUMMARY (1) + STUDY_DESIGN (1) + ELIGIBILITY_INCLUSION (N) + ELIGIBILITY_EXCLUSION (N)
+    - Produces: BRIEF_SUMMARY (1) + STUDY_DESIGN (0-1, where present) + ELIGIBILITY_INCLUSION (N) + ELIGIBILITY_EXCLUSION (N)
 
 - [x] **3.2 Embedding Generation Service:**
   - [x] File: `backend/app/retrieval/__init__.py`
@@ -124,41 +126,133 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
     - Dimension sanity check against `settings.OPENAI_EMBEDDING_DIMENSIONS` before DB write
 
 - [x] **3.3 Ingestion Pipeline Script:**
+  *Audit fix: re-chunked 25 trials (460 → 563 chunks); `--skip-embed` protects existing embeddings unless `--force`; continue-on-error loop.*
   - [x] File: `backend/app/ingest/pipeline.py`:
     - CLI with staged flags: `--dry-run`, `--limit N`, `--nct-id`, `--one-per-category`, `--skip-embed`
     - Reads `data/downloads/manifest.json`, resolves local JSON paths, calls chunker + embeddings
     - Upserts `clinical_trials` via `ON CONFLICT DO UPDATE` (idempotent re-runs)
     - Deletes + bulk re-inserts `trial_chunks` per trial (clean slate on re-ingest)
-    - **Result: 25 trials | 460 chunks | 460 embeddings (dim=1536) committed to Supabase**
+    - **Result: 25 trials | 563 chunks | 563 embeddings (dim=1536) committed to Supabase**
 
 ---
 
 ## Phase 4: Hybrid Retrieval Engine (in `backend/app/retrieval`)
 
-- [ ] **4.1 Semantic Vector Search:**
-  - [ ] File: `backend/app/retrieval/vector_search.py`:
-    - Cosine similarity matching (`<=>`) against `trial_chunks.embedding` using `pgvector`
-    - Optional metadata filtering by disease category or NCT ID
+### Pre-Phase 4 Gate & Foundation
+- [x] **Gate A1 — Embedding Completeness:** `SELECT count(*) FROM trial_chunks WHERE embedding IS NULL` == 0 *(Verified: 563/563 non-null vectors)*
+- [x] **Gate A2 — Exclusion Labeling:** `SELECT count(*) FROM trial_chunks WHERE section_type='ELIGIBILITY_EXCLUSION'` == 268 *(Verified: 268 exclusion chunks)*
+- [ ] **Gate A3 — Working Tree Cleanliness:** Commit all pre-Phase 4 audit fixes so Phase 4 diffs remain isolated and bisectable.
+- [x] **Gate A4 — Architectural Decisions Locked:**
+  - **B1 (File Names):** `rrf.py` and `hybrid.py` locked across `todos.md` and `architecture.md`.
+  - **B2 (Header in FTS):** Migration `0002` will widen `search_vector` trigger to `chunk_text || ' ' || section_header` with a backfill update (no re-embedding required).
+  - **B3 (Concurrency Safety):** Sequential execution on single `AsyncSession` — **NEVER** `asyncio.gather` on SQLAlchemy session.
+  - **B4 (Constants):** `RRF_K = 60`, `VECTOR_TOP_K = 50`, `FTS_TOP_K = 50`, `DEFAULT_LIMIT = 8`.
+  - **B5 (Abstention Floor):** Carry raw cosine similarity (`similarity: float | None`) alongside fused score; caller applies ~0.30 floor, returning `[]` on low confidence to trigger protocol silence refusal.
+  - **B6 (Category Filters):** Use real snake_case values from `manifest.json` (`non_small_cell_lung_cancer`, `melanoma`, etc.).
 
-- [ ] **4.2 Postgres Full-Text Search:**
-  - [ ] File: `backend/app/retrieval/fts_search.py`:
-    - Exact medical keyword matching using `websearch_to_tsquery` against `trial_chunks.search_vector`
-    - Preserves exact oncology terms: *KRAS G12D*, *EGFR Exon 20*, *HER2-low*, *ANC*, *DLT*, *washout*
+---
 
-- [ ] **4.3 Reciprocal Rank Fusion (RRF):**
+### Step-by-Step Implementation Sequence (Ordered Build)
+
+- [ ] **Step 1: Pytest Setup, Test Skeleton & Schema Extension:**
+  - [ ] File: `backend/pyproject.toml`:
+    - Add `[tool.pytest.ini_options]` with `integration` marker:
+      ```toml
+      [tool.pytest.ini_options]
+      markers = ["integration: needs live Supabase + embedding API"]
+      addopts = "-m 'not integration'"
+      ```
+  - [ ] Create `backend/tests/__init__.py`
+  - [ ] File: `backend/app/assistant/schemas.py`:
+    - Extend `ProtocolPassage` with join key and display fields:
+      ```python
+      class ProtocolPassage(BaseModel):
+          chunk_id: uuid.UUID                  # RRF dedup key & MessageCitation FK (Phase 5.5)
+          nct_id: str
+          section_type: str                    # ELIGIBILITY_EXCLUSION, etc.
+          section_header: str
+          chunk_text: str                      # Verbatim quote text
+          similarity: float | None = None      # Raw cosine similarity (1 - distance)
+          last_update_posted_date: date | None = None
+          brief_title: str | None = None
+      ```
+
+- [ ] **Step 2: Reciprocal Rank Fusion (RRF) & Unit Tests (Pure, Offline):**
   - [ ] File: `backend/app/retrieval/rrf.py`:
-    - In-memory RRF fusion algorithm combining semantic and lexical score rankings ($k=60$)
-    - Normalizes scores and yields top-k deduplicated passages
+    - Implement `reciprocal_rank_fusion(ranked_lists: list[list[uuid.UUID]], k: int = 60) -> list[tuple[uuid.UUID, float]]`
+    - Returns `(chunk_id, fused_score)` sorted descending, deduplicated
+    - Deterministic tie-breaking by `chunk_id`
+    - Pure in-memory math, no DB or network I/O
+  - [ ] File: `backend/tests/test_rrf.py`:
+    - Unit tests: hand-computed ranking order, $1/(60+rank)$ calculation, score summation when chunk is in both lists, tie-breaking, empty input handling
 
-- [ ] **4.4 Hybrid Retrieval Orchestrator:**
+- [ ] **Step 3: Protocol Chunker Corpus Invariant Tests (Offline):**
+  - [ ] File: `backend/tests/test_chunker.py`:
+    - Offline regression tests over all 25 downloaded JSONs:
+      - `total_chunks == 563`
+      - Exactly 1 `BRIEF_SUMMARY` per trial
+      - Every trial with an exclusion heading produces `ELIGIBILITY_EXCLUSION` chunks (guards against D-1 regression)
+      - Numbered lists (`1.`, `1)`) parsed into distinct criteria (guards against D-2 regression)
+      - `max(chunk.token_count) <= 1600`
+      - Non-empty `section_header` and `chunk_text` on every chunk
+      - `(nct_id, chunk_index)` uniqueness
+
+- [ ] **Step 4: Migration 0002 — Widen Full-Text Search Trigger:**
+  - [ ] File: `backend/alembic/versions/0002_widen_fts_trigger_to_include_header.py`:
+    - Widen `trial_chunks.search_vector` trigger to `chunk_text || ' ' || section_header`
+  - [ ] Run `uv run alembic upgrade head`
+  - [ ] Execute backfill: `UPDATE trial_chunks SET chunk_text = chunk_text;` (seconds-long, no API re-embedding)
+
+- [ ] **Step 5: Semantic Vector Search & Postgres Full-Text Search:**
+  - [ ] File: `backend/app/retrieval/vector_search.py`:
+    - `async def vector_search(session: AsyncSession, query: str, *, disease_category: str | None = None, nct_id: str | None = None, limit: int = 50) -> list[ProtocolPassage]`
+    - Query embedding via `await embed_texts([query])` (reuse shared service; never hardcode model name)
+    - Assert `len(vec) == settings.OPENAI_EMBEDDING_DIMENSIONS`
+    - Order by `embedding <=> :vec` (cosine distance); compute `similarity = 1 - distance`
+  - [ ] File: `backend/app/retrieval/fts_search.py`:
+    - `async def fts_search(session: AsyncSession, query: str, *, disease_category: str | None = None, nct_id: str | None = None, limit: int = 50) -> list[ProtocolPassage]`
+    - Use `websearch_to_tsquery('english', :q)` to gracefully handle unescaped medical text
+    - Order by `ts_rank_cd(search_vector, query)`
+    - Return `[]` if `websearch_to_tsquery` yields an empty query (e.g. stop-words)
+
+- [ ] **Step 6: Hybrid Retrieval Orchestrator & Chat Integration:**
   - [ ] File: `backend/app/retrieval/hybrid.py`:
-    - Unified `retrieve_protocols(query, disease_category=None, limit=8)` function
-    - Fetches top passages with trial metadata and section titles
+    - `async def retrieve_protocols(session: AsyncSession, query: str, *, disease_category: str | None = None, limit: int = 8, min_similarity: float | None = None) -> list[ProtocolPassage]`
+    - Execute vector and FTS searches sequentially on one session (B3)
+    - Fuse candidate pools via `reciprocal_rank_fusion`
+    - Enrich fused chunks with single join to `clinical_trials` for `brief_title` and `last_update_posted_date`
+    - Resilience: if embedding API fails, log warning and return FTS-only results rather than aborting chat turn
+    - Apply `min_similarity` floor (abstention signal for protocol silence)
+  - [ ] File: `backend/app/chat/orchestrator.py`:
+    - Call `retrieve_protocols` inside `pre_session` (while session is open) — NOT after closing
+    - Update `build_openai_messages` to accept `passages: list[ProtocolPassage]` and format numbered blocks (`[Passage 1]`, `[Passage 2]`)
+    - Delete `_stub_retrieve` and verify no references to `NCT05794958` remain in the codebase
 
-- [ ] **4.5 Retrieval Verification Test Suite:**
-  - [ ] File: `backend/tests/test_retrieval.py`:
-    - Pytest suite verifying biomarker queries, lab limit queries, and washout period queries
-    - Asserts that target landmark NCT IDs appear in top 3 retrieved results
+- [ ] **Step 7: Retrieval Integration Test Suite & Verification:**
+  - [ ] File: `backend/tests/test_retrieval.py` (`@pytest.mark.integration`):
+    - Target queries: KRAS G12D (NCT07659782 in top 3), washout periods, lab limit queries
+    - Exclusion queries: verify returned `section_header` contains "Exclusion" and NOT "Inclusion"
+    - Abstention queries: verify unrelated medical queries return `[]` or fall below similarity floor
+    - Verify all returned `chunk_id`s exist in `trial_chunks` and no fabricated NCT IDs appear
+
+---
+
+### Guardrails & Non-Negotiables
+- **No external reranker libraries:** Do NOT add `rank_bm25`, `sentence-transformers`, or Cohere. Postgres handles both vector and lexical retrieval.
+- **No hardcoded embedding models:** Always use `settings.OPENAI_EMBEDDING_MODEL` via `embed_texts()`.
+- **No concurrency on AsyncSession:** Never use `asyncio.gather` for queries on the same session.
+- **Read-only retrieval:** `backend/app/retrieval/` must never write to the database.
+- **Locked RRF_K:** Keep `RRF_K = 60` as spec'd; do not tune without a formal evaluation benchmark.
+
+---
+
+### Definition of Done for Phase 4
+1. `uv run pytest` passes all offline tests (0 failures).
+2. `uv run pytest -m integration` passes against live Supabase.
+3. Manual chat smoke test yields streaming tokens citing real landmark NCT IDs from the 25-trial corpus.
+4. `grep -r "NCT05794958" backend/` returns 0 results.
+5. Zero DB connections held across SSE stream (D-4 property maintained).
+6. File names reconciled across `todos.md` and `architecture.md`.
 
 ---
 
@@ -187,6 +281,7 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
     - `persist_turn(session, thread_id, user_content, assistant_content)` — writes user + assistant `ChatMessage` rows in one transaction after stream completes
 
 - [x] **5.3 Streaming Chat Orchestrator:**
+  *Audit fix: short-lived DB sessions (no DB hold during SSE stream); `BaseException` persist guard; 8k token history trim; graceful `3:` error frames.*
   - [x] File: `backend/app/chat/__init__.py`: Package marker
   - [x] File: `backend/app/chat/orchestrator.py`:
     - `stream_chat_turn(db, user, request) → AsyncGenerator[str, None]`
@@ -201,6 +296,7 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
     9. Yield final frame: `d:{"finishReason":"stop"}\n`
 
 - [x] **5.4 FastAPI Chat Endpoints:**
+  *Audit fix: removed `db` session dependency from `chat_stream` route.*
   - [x] File: `backend/app/api/chat.py` — all routes require `get_current_user`:
     - `POST /api/chat/threads` → create thread → `ThreadOut` (201)
     - `GET /api/chat/threads` → list user's threads → `list[ThreadOut]`
@@ -240,9 +336,10 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
 ## Phase 6: Frontend Clinical UI (in `frontend/`)
 
 - [x] **6.1 Scaffolding & Build Tooling:**
+  *Audit fix: removed unused `@ai-sdk/react` & `ai` packages (13 packages).*
   - [x] Initialize Vite + React 19 Single Page Application with TypeScript (`pnpm create vite . --template react-ts`)
   - [x] File: `frontend/package.json`:
-    - Dependencies: `@ai-sdk/react`, `@supabase/supabase-js`, `react-router-dom`, `lucide-react`, `clsx`, `tailwind-merge`, `@base-ui/react`
+    - Dependencies: `@supabase/supabase-js`, `react-router-dom`, `lucide-react`, `clsx`, `tailwind-merge`, `@base-ui/react`
     - Dev dependencies: `tailwindcss` (v4), `@tailwindcss/vite`
   - [x] File: `frontend/vite.config.ts`: Vite build configuration with `@tailwindcss/vite` and `@/*` alias
   - [x] File: `frontend/src/index.css`: Tailwind CSS v4 directives and Nova theme tokens
@@ -250,6 +347,7 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
 
 
 - [x] **6.2 Environment, Auth Client & Login Page:**
+  *Audit fix: aligned `TrialSummary`/`TrialDetail` in `api.ts` to DB schema; fixed `.gitignore` to track `frontend/src/lib/`.*
   - [x] File: `frontend/src/lib/env.ts`: Single source of truth for frontend environment variables (`VITE_API_BASE_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`)
   - [x] File: `frontend/src/lib/supabase.ts`: Supabase browser client (singleton, `persistSession: true`, `autoRefreshToken: true`)
   - [x] File: `frontend/src/lib/api.ts`: Fetch wrapper that automatically attaches the Supabase session JWT to outbound requests; typed `api.me()`, `api.trials.*`, `api.chat.*` helpers
@@ -260,6 +358,7 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
   - [x] File: `frontend/src/pages/Dashboard.tsx`: Auth smoke-test screen — calls `GET /api/me` and displays backend-verified identity
 
 - [x] **6.4 Chat Shell — Frontend:**
+  *Audit fix: clarified native SSE `ReadableStream` parser in `useChatStream.ts` instead of `useChat`.*
   - [x] File: `frontend/src/lib/api.ts` **(extend existing)**:
     - Add `api.chat.createThread()` → `ThreadOut`
     - Add `api.chat.deleteThread(id)` → `void`

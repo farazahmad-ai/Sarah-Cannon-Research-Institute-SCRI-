@@ -251,6 +251,15 @@ async def _process_trial(study: dict, args: argparse.Namespace) -> dict:
 
     # Step 2: Chunk the protocol
     chunks = chunk_protocol(trial)
+    for chunk in chunks:
+        if chunk.token_count > 600:
+            logger.warning(
+                "%s  Oversized chunk [%s: %s] has %d estimated tokens (soft ceiling: 600)",
+                nct_id,
+                chunk.section_type,
+                chunk.section_header,
+                chunk.token_count,
+            )
 
     if args.dry_run:
         _print_dry_run(trial, chunks)

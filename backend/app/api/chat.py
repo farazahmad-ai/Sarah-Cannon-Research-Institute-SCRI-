@@ -21,11 +21,12 @@ from app.chat.orchestrator import stream_chat_turn
 from app.database.chats import (
     create_thread,
     delete_thread,
+    get_thread,
     list_messages,
     list_threads,
     upsert_profile,
 )
-from app.database.session import get_db_session
+from app.database.session import async_session_factory, get_db_session
 
 chat_router = APIRouter(prefix="/chat", tags=["Chat"])
 
@@ -45,10 +46,7 @@ async def create_new_thread(
     user_uuid = uuid.UUID(user.id) if isinstance(user.id, str) else user.id
     await upsert_profile(db, user_uuid, user.email)
 
-    title = "New Screening Session"
-    if payload and payload.title and payload.title.strip():
-        title = payload.title.strip()
-
+    title = payload.title if payload and payload.title else "New Screening Session"
     thread = await create_thread(db, user_uuid, title=title)
     return ThreadOut.model_validate(thread)
 
@@ -64,8 +62,6 @@ async def get_user_threads(
 ) -> List[ThreadOut]:
     """Return all screening threads belonging to the authenticated coordinator."""
     user_uuid = uuid.UUID(user.id) if isinstance(user.id, str) else user.id
-    await upsert_profile(db, user_uuid, user.email)
-
     threads = await list_threads(db, user_uuid)
     return [ThreadOut.model_validate(t) for t in threads]
 
@@ -136,11 +132,30 @@ async def chat_stream(
 ) -> StreamingResponse:
     """Stream token deltas in Vercel AI SDK data-stream format.
 
-    No DB session is injected here (D-4). The orchestrator opens and closes
-    its own short-lived sessions so that zero pooled connections are held
-    during the SSE stream. Thread ownership is verified inside the orchestrator
-    before any tokens are yielded.
+    No DB session is held during the SSE stream (D-4). The orchestrator opens
+    and closes its own short-lived sessions.
+
+    If request.thread_id is supplied, ownership is pre-validated in a short-lived
+    session before starting the stream, ensuring 404/403 errors are returned as
+    proper HTTP status codes rather than an aborted stream (R-5).
     """
+    user_uuid = uuid.UUID(user.id) if isinstance(user.id, str) else user.id
+
+    if request.thread_id is not None:
+        async with async_session_factory() as session:
+            try:
+                await get_thread(session, request.thread_id, user_uuid)
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=str(exc),
+                ) from exc
+            except PermissionError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=str(exc),
+                ) from exc
+
     return StreamingResponse(
         stream_chat_turn(user, request),
         media_type="text/event-stream",

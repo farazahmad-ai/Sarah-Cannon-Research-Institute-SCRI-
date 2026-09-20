@@ -248,10 +248,11 @@ backend/app/
 ├── grounding/
 │   └── validator.py                 # Enforces citation-to-chunk verification
 └── retrieval/
-    ├── embedder.py                  # text-embedding-3-small query encoder
-    ├── queries.py                   # pgvector and tsquery raw SQL queries
-    ├── fusion.py                    # Reciprocal Rank Fusion (RRF) implementation
-    └── retriever.py                 # Hybrid retriever orchestrator
+    ├── embeddings.py                # text-embedding-3-small query encoder (shared service)
+    ├── vector_search.py             # pgvector cosine similarity search
+    ├── fts_search.py                # PostgreSQL full-text search with websearch_to_tsquery
+    ├── rrf.py                       # Reciprocal Rank Fusion (RRF) algorithm (k=60)
+    └── hybrid.py                    # Unified hybrid retrieval orchestrator
 ```
 
 ### Agent Dependencies & Schema Contracts:
@@ -259,14 +260,14 @@ backend/app/
 ```python
 from dataclasses import dataclass
 from pydantic import BaseModel, Field
-from app.retrieval.retriever import HybridRetriever
+from app.retrieval.hybrid import retrieve_protocols
 from app.grounding.validator import GroundingValidator
 
 @dataclass
 class OncologyAgentDeps:
     user_id: str
     thread_id: str
-    retriever: HybridRetriever
+    retriever: Any  # retrieve_protocols function
     validator: GroundingValidator
 
 class Citation(BaseModel):
@@ -509,7 +510,7 @@ The production deployment runs on **Railway** with hosted **Supabase**:
    - [ ] Implement Supabase JWT bearer token verification dependency.
 3. **Retrieval & PydanticAI Agent:**
    - [ ] Implement `pgvector` cosine similarity and Postgres `to_tsquery` searches.
-   - [ ] Implement Reciprocal Rank Fusion (RRF) in `backend/app/retrieval/fusion.py`.
+   - [ ] Implement Reciprocal Rank Fusion (RRF) in `backend/app/retrieval/rrf.py`.
    - [ ] Implement PydanticAI oncology agent with typed `GroundedAnswer` output and strict negative constraints.
    - [ ] Implement citation validation in `backend/app/grounding/validator.py`.
 4. **Streaming & Frontend Client:**
