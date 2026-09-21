@@ -33,16 +33,16 @@ from pathlib import Path
 from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from app.database.models import ClinicalTrial, TrialChunk
+from app.database.session import async_session_factory
+from app.ingest.chunker import ChunkPayload, ParsedTrial, chunk_protocol, load_trial_json
+from app.retrieval.embeddings import embed_texts
+
 # Pipeline must be run from the backend/ directory so relative imports resolve
 # Path resolution: backend/app/ingest/pipeline.py -> backend/data/downloads/
 _BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
 _DOWNLOADS_DIR = _BACKEND_DIR.parent / "data" / "downloads"
 _MANIFEST_PATH = _DOWNLOADS_DIR / "manifest.json"
-
-from app.database.models import ClinicalTrial, TrialChunk
-from app.database.session import async_session_factory
-from app.ingest.chunker import ChunkPayload, ParsedTrial, chunk_protocol, load_trial_json
-from app.retrieval.embeddings import embed_texts
 
 logging.basicConfig(
     level=logging.INFO,

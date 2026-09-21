@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
-import uuid
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,8 +22,8 @@ async def vector_search(
     session: AsyncSession,
     query: str,
     *,
-    disease_category: Optional[str] = None,
-    nct_id: Optional[str] = None,
+    disease_category: str | None = None,
+    nct_id: str | None = None,
     limit: int = VECTOR_TOP_K,
 ) -> list[ProtocolPassage]:
     """Execute dense semantic vector search against trial_chunks.embedding.

@@ -9,9 +9,9 @@ Defines schemas for:
 - MessageCitation: Grounded, verifiable citations linking assistant assertions to verbatim protocol chunks.
 """
 
-from datetime import date, datetime
-from typing import Any, Dict, List, Optional
 import uuid
+from datetime import date, datetime
+from typing import Any, Optional
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
@@ -49,7 +49,7 @@ class Profile(Base, TimestampMixin):
         index=True,
         nullable=False,
     )
-    full_name: Mapped[Optional[str]] = mapped_column(
+    full_name: Mapped[str | None] = mapped_column(
         String(255),
         nullable=True,
     )
@@ -61,7 +61,7 @@ class Profile(Base, TimestampMixin):
     )
 
     # Relationships
-    threads: Mapped[List["ChatThread"]] = relationship(
+    threads: Mapped[list["ChatThread"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
         order_by="ChatThread.created_at.desc()",
@@ -96,11 +96,11 @@ class ClinicalTrial(Base, TimestampMixin):
         String(500),
         nullable=False,
     )
-    official_title: Mapped[Optional[str]] = mapped_column(
+    official_title: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
     )
-    organization: Mapped[Optional[str]] = mapped_column(
+    organization: Mapped[str | None] = mapped_column(
         String(255),
         nullable=True,
     )
@@ -111,42 +111,42 @@ class ClinicalTrial(Base, TimestampMixin):
         nullable=False,
     )
     # Critical clinical timeline dates
-    last_update_posted_date: Mapped[Optional[date]] = mapped_column(
+    last_update_posted_date: Mapped[date | None] = mapped_column(
         Date,
         nullable=True,
     )
-    start_date: Mapped[Optional[date]] = mapped_column(
+    start_date: Mapped[date | None] = mapped_column(
         Date,
         nullable=True,
     )
-    primary_completion_date: Mapped[Optional[date]] = mapped_column(
+    primary_completion_date: Mapped[date | None] = mapped_column(
         Date,
         nullable=True,
     )
     # Structured clinical arrays stored as JSONB
-    phases: Mapped[Optional[List[Any]]] = mapped_column(
+    phases: Mapped[list[Any] | None] = mapped_column(
         JSONB,
         nullable=True,
     )
-    conditions: Mapped[Optional[List[Any]]] = mapped_column(
+    conditions: Mapped[list[Any] | None] = mapped_column(
         JSONB,
         nullable=True,
     )
-    arms: Mapped[Optional[List[Any]]] = mapped_column(
+    arms: Mapped[list[Any] | None] = mapped_column(
         JSONB,
         nullable=True,
     )
-    primary_outcomes: Mapped[Optional[List[Any]]] = mapped_column(
+    primary_outcomes: Mapped[list[Any] | None] = mapped_column(
         JSONB,
         nullable=True,
     )
-    source_url: Mapped[Optional[str]] = mapped_column(
+    source_url: Mapped[str | None] = mapped_column(
         String(500),
         nullable=True,
     )
 
     # Relationships
-    chunks: Mapped[List["TrialChunk"]] = relationship(
+    chunks: Mapped[list["TrialChunk"]] = relationship(
         back_populates="trial",
         cascade="all, delete-orphan",
         order_by="TrialChunk.chunk_index.asc()",
@@ -197,12 +197,12 @@ class TrialChunk(Base, TimestampMixin):
         nullable=False,
     )
     # Dense vector representation from text-embedding-3-small (1536 dimensions)
-    embedding: Mapped[Optional[List[float]]] = mapped_column(
+    embedding: Mapped[list[float] | None] = mapped_column(
         Vector(1536),
         nullable=True,
     )
     # Full-text search tsvector generated for exact oncology terms
-    search_vector: Mapped[Optional[str]] = mapped_column(
+    search_vector: Mapped[str | None] = mapped_column(
         TSVECTOR,
         nullable=True,
     )
@@ -211,7 +211,7 @@ class TrialChunk(Base, TimestampMixin):
         default=0,
         nullable=False,
     )
-    metadata_json: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(
         JSONB,
         nullable=True,
     )
@@ -220,7 +220,7 @@ class TrialChunk(Base, TimestampMixin):
     trial: Mapped["ClinicalTrial"] = relationship(
         back_populates="chunks",
     )
-    citations: Mapped[List["MessageCitation"]] = relationship(
+    citations: Mapped[list["MessageCitation"]] = relationship(
         back_populates="chunk",
     )
 
@@ -257,7 +257,7 @@ class ChatThread(Base, TimestampMixin):
     user: Mapped["Profile"] = relationship(
         back_populates="threads",
     )
-    messages: Mapped[List["ChatMessage"]] = relationship(
+    messages: Mapped[list["ChatMessage"]] = relationship(
         back_populates="thread",
         cascade="all, delete-orphan",
         order_by="ChatMessage.created_at.asc()",
@@ -298,7 +298,7 @@ class ChatMessage(Base, TimestampMixin):
         nullable=False,
     )
     # Metadata: latency_ms, tokens_used, model_name
-    metadata_json: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(
         JSONB,
         nullable=True,
     )
@@ -307,7 +307,7 @@ class ChatMessage(Base, TimestampMixin):
     thread: Mapped["ChatThread"] = relationship(
         back_populates="messages",
     )
-    citations: Mapped[List["MessageCitation"]] = relationship(
+    citations: Mapped[list["MessageCitation"]] = relationship(
         back_populates="message",
         cascade="all, delete-orphan",
         order_by="MessageCitation.citation_index.asc()",
@@ -338,7 +338,7 @@ class MessageCitation(Base):
         index=True,
         nullable=False,
     )
-    chunk_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+    chunk_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("trial_chunks.id", ondelete="SET NULL"),
         index=True,

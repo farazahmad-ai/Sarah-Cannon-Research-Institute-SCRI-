@@ -16,7 +16,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from openai import AsyncOpenAI, RateLimitError, APIStatusError
+from openai import APIStatusError, AsyncOpenAI, RateLimitError
 
 from app.config import settings
 

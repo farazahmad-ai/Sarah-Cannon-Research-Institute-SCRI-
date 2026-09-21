@@ -8,7 +8,6 @@ Provides:
 - POST /api/chat/stream: Streaming response yielding Vercel AI SDK text frames.
 """
 
-from typing import List
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
@@ -53,13 +52,13 @@ async def create_new_thread(
 
 @chat_router.get(
     "/threads",
-    response_model=List[ThreadOut],
+    response_model=list[ThreadOut],
     summary="List all user screening threads",
 )
 async def get_user_threads(
     db: AsyncSession = Depends(get_db_session),
     user: AuthenticatedUser = Depends(get_current_user),
-) -> List[ThreadOut]:
+) -> list[ThreadOut]:
     """Return all screening threads belonging to the authenticated coordinator."""
     user_uuid = uuid.UUID(user.id) if isinstance(user.id, str) else user.id
     threads = await list_threads(db, user_uuid)
@@ -96,14 +95,14 @@ async def remove_thread(
 
 @chat_router.get(
     "/threads/{thread_id}/messages",
-    response_model=List[MessageOut],
+    response_model=list[MessageOut],
     summary="Get thread message history",
 )
 async def get_thread_messages(
     thread_id: uuid.UUID,
     db: AsyncSession = Depends(get_db_session),
     user: AuthenticatedUser = Depends(get_current_user),
-) -> List[MessageOut]:
+) -> list[MessageOut]:
     """Return chronological message turns for a thread after ownership check."""
     user_uuid = uuid.UUID(user.id) if isinstance(user.id, str) else user.id
     try:

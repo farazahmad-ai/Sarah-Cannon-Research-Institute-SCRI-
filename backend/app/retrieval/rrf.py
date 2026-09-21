@@ -12,7 +12,7 @@ Pure in-memory math with deterministic tie-breaking.
 from __future__ import annotations
 
 import uuid
-from typing import List, Sequence, Tuple
+from collections.abc import Sequence
 
 # Standard RRF smoothing constant spec'd in architecture.md:322
 RRF_K: int = 60
@@ -21,7 +21,7 @@ RRF_K: int = 60
 def reciprocal_rank_fusion(
     ranked_lists: Sequence[Sequence[uuid.UUID]],
     k: int = RRF_K,
-) -> List[Tuple[uuid.UUID, float]]:
+) -> list[tuple[uuid.UUID, float]]:
     """Fuse multiple ranked lists of chunk UUIDs using Reciprocal Rank Fusion.
 
     Parameters:

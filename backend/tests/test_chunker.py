@@ -7,6 +7,7 @@ mislabeling) and D-2 (numbered-list collapse).
 
 import json
 from pathlib import Path
+
 from app.ingest.chunker import chunk_protocol, load_trial_json
 
 _WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
@@ -22,7 +23,6 @@ def _load_all_trials():
 
     trials_with_chunks = []
     for entry in manifest["studies"]:
-        nct_id = entry["nct_id"]
         json_path = _DOWNLOADS_DIR / entry["local_json_path"]
         assert json_path.exists(), f"Trial JSON missing: {json_path}"
 

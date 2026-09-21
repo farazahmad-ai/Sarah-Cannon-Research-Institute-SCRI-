@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
-import uuid
 
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.assistant.schemas import ProtocolPassage
@@ -22,8 +20,8 @@ async def fts_search(
     session: AsyncSession,
     query: str,
     *,
-    disease_category: Optional[str] = None,
-    nct_id: Optional[str] = None,
+    disease_category: str | None = None,
+    nct_id: str | None = None,
     limit: int = FTS_TOP_K,
 ) -> list[ProtocolPassage]:
     """Execute lexical full-text search against trial_chunks.search_vector.
@@ -80,7 +78,7 @@ async def fts_search(
     rows = result.all()
 
     passages: list[ProtocolPassage] = []
-    for chunk, brief_title, last_update_posted_date, rank in rows:
+    for chunk, brief_title, last_update_posted_date, _rank in rows:
         passages.append(
             ProtocolPassage(
                 chunk_id=chunk.id,

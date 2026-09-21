@@ -7,9 +7,8 @@ the need to manage Supabase's rotating signing keys inside application code.
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from supabase import AuthApiError
 from pydantic import BaseModel
-from supabase import AsyncClient
+from supabase import AsyncClient, AuthApiError
 
 from app.database.supabase import get_supabase_admin
 

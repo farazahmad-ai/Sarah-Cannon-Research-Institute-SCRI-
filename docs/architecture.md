@@ -501,26 +501,31 @@ The production deployment runs on **Railway** with hosted **Supabase**:
 ## 15. Implementation Sequence & Milestones
 
 1. **Data Pipeline & Seeding:**
-   - [x] Implement [data/download.py](file:///g:/My%20Drive/FarazAhmad-ai/projects/Sarah%20Cannon%20Research%20Institute%20%28SCRI%29/data/download.py) with ClinicalTrials.gov REST API v2 integration.
+   - [x] Implement `data/download.py` with ClinicalTrials.gov REST API v2 integration.
    - [x] Sort by `LastUpdatePostDate:desc` and extract rich dates, arms, and clinical endpoints.
-   - [ ] Implement chunker and ingestion script to populate Supabase `clinical_trials` and `trial_chunks`.
+   - [x] Implement chunker and ingestion script to populate Supabase `clinical_trials` and `trial_chunks` (563 chunks across 25 landmark trials).
 2. **Backend Core & Database:**
-   - [ ] Initialize SQLAlchemy models in `backend/app/database/models.py`.
-   - [ ] Generate Alembic migrations for `pgvector`, HNSW indexes, full-text search, and chat tables.
-   - [ ] Implement Supabase JWT bearer token verification dependency.
-3. **Retrieval & PydanticAI Agent:**
-   - [ ] Implement `pgvector` cosine similarity and Postgres `to_tsquery` searches.
-   - [ ] Implement Reciprocal Rank Fusion (RRF) in `backend/app/retrieval/rrf.py`.
-   - [ ] Implement PydanticAI oncology agent with typed `GroundedAnswer` output and strict negative constraints.
+   - [x] Initialize SQLAlchemy models in `backend/app/database/models.py`.
+   - [x] Generate Alembic migrations for `pgvector`, HNSW indexes, full-text search, and chat tables (`0001_initial_schema`, `0002_widen_fts_header`).
+   - [x] Implement Supabase JWT bearer token verification dependency (`backend/app/auth/jwt.py`).
+3. **Retrieval Engine & Hybrid Fusion:**
+   - [x] Implement `pgvector` cosine similarity (`vector_search.py`) and Postgres `websearch_to_tsquery` (`fts_search.py`) searches.
+   - [x] Implement Reciprocal Rank Fusion (RRF $k=60$) in `backend/app/retrieval/rrf.py`.
+   - [x] Implement hybrid retrieval orchestrator with B5 similarity floor and C5 embedding outage fallback in `backend/app/retrieval/hybrid.py`.
+   - [ ] Implement PydanticAI oncology agent with typed dependencies and strict negative constraints (`backend/app/assistant/`).
    - [ ] Implement citation validation in `backend/app/grounding/validator.py`.
 4. **Streaming & Frontend Client:**
-   - [ ] Implement `POST /chat/stream` SSE endpoint emitting AI SDK compliant parts.
-   - [ ] Build React chat UI with Vercel AI SDK React primitives.
-   - [ ] Build interactive clinical citation badge and popover components.
-   - [ ] Build trial catalog and slide-out protocol drawer.
+   - [x] Implement `POST /api/chat/stream` SSE endpoint emitting Vercel AI SDK data-stream protocol (`orchestrator.py`).
+   - [x] Build React 19 / Vite SPA with native SSE `useChatStream.ts` parser and multi-turn persistence.
+   - [ ] Build interactive clinical citation badge and popover components (`CitationPill.tsx`, `CitationPopover.tsx`).
+   - [ ] Build trial catalog and slide-out protocol drawer (`TrialDetailDrawer.tsx`).
 5. **Evaluation & Verification:**
-   - [ ] Execute test suite of 10 coordinator oncology screening benchmark questions.
+   - [ ] Execute test suite of 10 coordinator oncology screening benchmark questions (`backend/tests/test_clinical_benchmarks.py`).
    - [ ] Verify 100% citation grounding and zero hallucinations on protocol silence tests.
+
+> [!NOTE]
+> **Architectural Decision — FTS Precision Anchor vs. Semantic Recall (Audit Finding 4):**
+> PostgreSQL `websearch_to_tsquery` enforces strict AND-semantics across all query terms. For complex, natural language questions asked by clinical coordinators (e.g., 7–10 words), lexical FTS may return 0 candidates. This behavior is intentional: FTS acts as a high-precision anchor for exact biomarkers, lab limits, and gene alleles (e.g. `"KRAS G12D"`, `"ANC >= 1500"`), while `pgvector` provides high-recall semantic matching for broad medical phrasing. Reciprocal Rank Fusion smoothly integrates both streams.
 
 ---
 

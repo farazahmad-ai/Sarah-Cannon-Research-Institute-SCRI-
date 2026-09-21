@@ -6,11 +6,9 @@ Fails fast on startup if critical configuration keys are missing.
 """
 
 from functools import lru_cache
-from typing import List, Union
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
 
 
 class Settings(BaseSettings):
@@ -49,7 +47,7 @@ class Settings(BaseSettings):
     # --- CORS (Cross-Origin Resource Sharing) Configuration ---
     # Super necessary: Browsers block Vite SPA (localhost:5173) from calling FastAPI (localhost:8000)
     # unless explicit CORS headers are sent. This setting defines which frontend origins are trusted.
-    ALLOWED_ORIGINS: Union[List[str], str] = Field(
+    ALLOWED_ORIGINS: list[str] | str = Field(
         default_factory=lambda: ["http://localhost:5173"]
     )
 
@@ -106,7 +104,7 @@ class Settings(BaseSettings):
 
     @field_validator("ALLOWED_ORIGINS", mode="before")
     @classmethod
-    def parse_allowed_origins(cls, v: Union[str, List[str]]) -> List[str]:
+    def parse_allowed_origins(cls, v: str | list[str]) -> list[str]:
         """Convert comma-separated origin strings from .env into a clean Python list.
         
         Why this is super necessary:

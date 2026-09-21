@@ -7,6 +7,7 @@ Provides:
 """
 
 from collections.abc import AsyncGenerator
+
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -15,7 +16,6 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app.config import settings
-
 
 # Configure non-blocking async PostgreSQL engine with connection pooling.
 # Super necessary: In production oncology environments, multiple research coordinators

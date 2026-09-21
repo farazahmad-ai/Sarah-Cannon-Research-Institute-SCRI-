@@ -17,7 +17,6 @@ from app.database.session import (
     engine,
     get_db_session,
 )
-
 from app.database.supabase import (
     get_supabase_admin,
     init_supabase_admin,

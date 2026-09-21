@@ -2,7 +2,8 @@
 
 import math
 import uuid
-from app.retrieval.rrf import RRF_K, reciprocal_rank_fusion
+
+from app.retrieval.rrf import reciprocal_rank_fusion
 
 
 def test_empty_inputs():

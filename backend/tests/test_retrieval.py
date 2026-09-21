@@ -39,7 +39,7 @@ async def test_kras_g12d_mutation_retrieval():
 @pytest.mark.integration
 @pytest.mark.anyio
 async def test_washout_period_retrieval():
-    """Washout query must return relevant trials with washout criteria in top 5."""
+    """Washout query must return relevant trials with explicit washout criteria in top 5."""
     async with async_session_factory() as session:
         passages = await retrieve_protocols(
             session,
@@ -48,9 +48,11 @@ async def test_washout_period_retrieval():
         )
         assert len(passages) > 0
 
-        # At least one returned passage must discuss prior therapy or washout
+        # At least one returned passage must explicitly contain "washout" in its text
         text_corpus = " ".join([p.chunk_text.lower() for p in passages])
-        assert "washout" in text_corpus or "prior" in text_corpus or "therapy" in text_corpus
+        assert "washout" in text_corpus, (
+            f"Expected explicit 'washout' clause in retrieved text, got: {text_corpus[:300]}"
+        )
 
 
 @pytest.mark.integration

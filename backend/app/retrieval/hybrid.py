@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,13 +21,47 @@ DEFAULT_LIMIT: int = 8
 DEFAULT_MIN_SIMILARITY: float = 0.30
 
 
+def apply_similarity_floor(
+    passages: list[ProtocolPassage],
+    floor: float | None,
+    *,
+    vector_search_healthy: bool = True,
+) -> list[ProtocolPassage]:
+    """Filter candidate passages by similarity floor to enforce protocol silence.
+
+    Rules:
+      1. If floor is None, all passages are accepted.
+      2. When vector_search_healthy is True:
+         - A passage must have a known cosine similarity (similarity is not None).
+         - That similarity must meet or exceed the floor (similarity >= floor).
+         - Pure lexical hits (similarity is None) that did not place in the top 50
+           vector results are excluded because their semantic relevance is unverified.
+      3. When vector_search_healthy is False (embedding API outage fallback C5):
+         - Lexical passages (similarity is None) are preserved so the system does not
+           completely blind the coordinator during third-party embedding outages.
+    """
+    if floor is None:
+        return passages
+
+    filtered: list[ProtocolPassage] = []
+    for p in passages:
+        if p.similarity is not None:
+            if p.similarity >= floor:
+                filtered.append(p)
+        elif not vector_search_healthy:
+            # Embedding outage resilience: accept FTS hits when vector search was unavailable
+            filtered.append(p)
+
+    return filtered
+
+
 async def retrieve_protocols(
     session: AsyncSession,
     query: str,
     *,
-    disease_category: Optional[str] = None,
+    disease_category: str | None = None,
     limit: int = DEFAULT_LIMIT,
-    min_similarity: Optional[float] = None,
+    min_similarity: float | None = DEFAULT_MIN_SIMILARITY,
 ) -> list[ProtocolPassage]:
     """Retrieve grounded clinical protocol passages using hybrid search.
 
@@ -37,7 +70,7 @@ async def retrieve_protocols(
          SEQUENTIALLY on the provided session (concurrency safety B3).
       2. If embedding generation fails, resiliently continue with FTS results.
       3. Fuse candidate rankings using Reciprocal Rank Fusion (RRF, k=60).
-      4. Apply optional similarity floor for protocol silence / abstention signal.
+      4. Apply similarity floor for protocol silence / abstention signal.
       5. Return top `limit` passages.
 
     Args:
@@ -45,7 +78,7 @@ async def retrieve_protocols(
         query: Coordinator screening query.
         disease_category: Optional snake_case disease filter (e.g. 'non_small_cell_lung_cancer').
         limit: Number of top fused passages to return (default 8).
-        min_similarity: Optional cosine similarity floor (e.g. 0.30).
+        min_similarity: Optional cosine similarity floor (defaults to DEFAULT_MIN_SIMILARITY=0.30).
 
     Returns:
         List of ProtocolPassage objects sorted by fused relevance.
@@ -55,6 +88,7 @@ async def retrieve_protocols(
         return []
 
     # Step 1: Sequential retrieval (B3 - never asyncio.gather on AsyncSession)
+    vector_search_healthy = True
     vector_passages: list[ProtocolPassage] = []
     try:
         vector_passages = await vector_search(
@@ -63,8 +97,9 @@ async def retrieve_protocols(
             disease_category=disease_category,
             limit=VECTOR_TOP_K,
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         # Resilience: if embedding service fails, log warning and continue FTS-only (C5)
+        vector_search_healthy = False
         logger.warning("Vector search failed during hybrid retrieval; falling back to FTS: %s", exc)
 
     fts_passages: list[ProtocolPassage] = []
@@ -75,7 +110,7 @@ async def retrieve_protocols(
             disease_category=disease_category,
             limit=FTS_TOP_K,
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         logger.warning("FTS search failed during hybrid retrieval: %s", exc)
 
     if not vector_passages and not fts_passages:
@@ -96,21 +131,18 @@ async def retrieve_protocols(
     ]
     fused_ranked = reciprocal_rank_fusion(ranked_lists, k=RRF_K)
 
-    # Step 4: Assemble fused passages and apply similarity floor if requested
-    fused_passages: list[ProtocolPassage] = []
-    floor = min_similarity
-
-    for chunk_id, fused_score in fused_ranked:
+    # Step 4: Assemble fused candidates and apply similarity floor (B5)
+    candidates: list[ProtocolPassage] = []
+    for chunk_id, _fused_score in fused_ranked:
         passage = passages_by_id.get(chunk_id)
-        if not passage:
-            continue
+        if passage:
+            candidates.append(passage)
 
-        # If similarity floor is specified and passage has similarity, check floor
-        if floor is not None and passage.similarity is not None and passage.similarity < floor:
-            continue
+    fused_passages = apply_similarity_floor(
+        candidates,
+        min_similarity,
+        vector_search_healthy=vector_search_healthy,
+    )
 
-        fused_passages.append(passage)
-        if len(fused_passages) >= limit:
-            break
+    return fused_passages[:limit]
 
-    return fused_passages

@@ -6,7 +6,6 @@ Enforces:
 - Unified persistence: User prompt and assistant stream are committed together.
 """
 
-from typing import List, Union
 import uuid
 
 from sqlalchemy import select
@@ -16,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.models import ChatMessage, ChatThread, Profile
 
 
-def _normalize_uuid(val: Union[uuid.UUID, str]) -> uuid.UUID:
+def _normalize_uuid(val: uuid.UUID | str) -> uuid.UUID:
     """Helper to ensure user_id or thread_id is a valid UUID instance."""
     if isinstance(val, uuid.UUID):
         return val
@@ -25,7 +24,7 @@ def _normalize_uuid(val: Union[uuid.UUID, str]) -> uuid.UUID:
 
 async def upsert_profile(
     session: AsyncSession,
-    user_id: Union[uuid.UUID, str],
+    user_id: uuid.UUID | str,
     email: str,
 ) -> None:
     """Ensure a profile record exists for the authenticated user.
@@ -45,7 +44,7 @@ async def upsert_profile(
 
 async def create_thread(
     session: AsyncSession,
-    user_id: Union[uuid.UUID, str],
+    user_id: uuid.UUID | str,
     title: str = "New Screening Session",
 ) -> ChatThread:
     """Create a new clinical screening chat thread."""
@@ -62,8 +61,8 @@ async def create_thread(
 
 async def list_threads(
     session: AsyncSession,
-    user_id: Union[uuid.UUID, str],
-) -> List[ChatThread]:
+    user_id: uuid.UUID | str,
+) -> list[ChatThread]:
     """Return all chat threads belonging to the user, newest first."""
     uid = _normalize_uuid(user_id)
     stmt = (
@@ -77,8 +76,8 @@ async def list_threads(
 
 async def get_thread(
     session: AsyncSession,
-    thread_id: Union[uuid.UUID, str],
-    user_id: Union[uuid.UUID, str],
+    thread_id: uuid.UUID | str,
+    user_id: uuid.UUID | str,
 ) -> ChatThread:
     """Retrieve a single thread with strict ownership enforcement.
     
@@ -104,8 +103,8 @@ async def get_thread(
 
 async def delete_thread(
     session: AsyncSession,
-    thread_id: Union[uuid.UUID, str],
-    user_id: Union[uuid.UUID, str],
+    thread_id: uuid.UUID | str,
+    user_id: uuid.UUID | str,
 ) -> None:
     """Delete a screening thread and all cascade-related messages and citations."""
     thread = await get_thread(session, thread_id, user_id)
@@ -115,9 +114,9 @@ async def delete_thread(
 
 async def list_messages(
     session: AsyncSession,
-    thread_id: Union[uuid.UUID, str],
-    user_id: Union[uuid.UUID, str],
-) -> List[ChatMessage]:
+    thread_id: uuid.UUID | str,
+    user_id: uuid.UUID | str,
+) -> list[ChatMessage]:
     """Fetch chronological message history for a thread, enforcing tenancy."""
     # Enforces ownership check; raises ValueError or PermissionError if invalid
     await get_thread(session, thread_id, user_id)
@@ -134,7 +133,7 @@ async def list_messages(
 
 async def persist_turn(
     session: AsyncSession,
-    thread_id: Union[uuid.UUID, str],
+    thread_id: uuid.UUID | str,
     user_content: str,
     assistant_content: str,
 ) -> tuple[ChatMessage, ChatMessage]:

@@ -44,3 +44,15 @@ markers = [
 ]
 addopts = "-m 'not integration'"
 
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = [
+    "B008",  # Allow FastAPI Depends() in route defaults
+    "E501",  # Allow long lines in clinical descriptions, SQL comments & logs
+]
+
+

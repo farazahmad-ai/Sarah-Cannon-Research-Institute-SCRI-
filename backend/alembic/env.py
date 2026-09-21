@@ -6,11 +6,12 @@ Configured for SCRI Oncology Copilot:
 - Configures pgvector and custom Postgres schema extensions
 """
 
-from logging.config import fileConfig
 import sys
+from logging.config import fileConfig
 from pathlib import Path
 
 from sqlalchemy import engine_from_config, pool
+
 from alembic import context
 
 # Ensure backend root is on sys.path
@@ -19,8 +20,8 @@ if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
 # Import application settings and declarative models
-from app.config import settings
-from app.database.models import Base
+from app.config import settings  # noqa: E402
+from app.database.models import Base  # noqa: E402
 
 # Alembic Config object, which provides access to values within alembic.ini
 config = context.config

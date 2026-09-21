@@ -5,8 +5,9 @@ for the React/Vite frontend, and defines fundamental health and diagnostic endpo
 All configuration parameters are pulled directly from `app.config.settings`.
 """
 
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator, Dict
+from typing import Any
 
 from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -83,9 +84,9 @@ app = create_application()
     tags=["Health"],
     summary="Application Health Check",
     status_code=status.HTTP_200_OK,
-    response_model=Dict[str, Any],
+    response_model=dict[str, Any],
 )
-async def health_check() -> Dict[str, Any]:
+async def health_check() -> dict[str, Any]:
     """Return health and status diagnostics for the copilot backend.
     
     Used by load balancers, container health monitors (Railway/Docker),
@@ -105,9 +106,9 @@ async def health_check() -> Dict[str, Any]:
     tags=["Root"],
     summary="API Root Information",
     status_code=status.HTTP_200_OK,
-    response_model=Dict[str, str],
+    response_model=dict[str, str],
 )
-async def root() -> Dict[str, str]:
+async def root() -> dict[str, str]:
     """Root endpoint welcoming clients and directing them to OpenAPI documentation."""
     return {
         "message": f"Welcome to {settings.APP_NAME} API",

@@ -8,9 +8,8 @@ Defines schemas for:
 - ProtocolPassage: Grounded trial protocol passage chunk.
 """
 
-from datetime import date, datetime
-from typing import Optional
 import uuid
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -18,7 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class ThreadCreate(BaseModel):
     """Payload for creating a new screening thread."""
 
-    title: Optional[str] = Field(
+    title: str | None = Field(
         default=None,
         max_length=255,
         description="Optional title for the clinical screening session",
@@ -28,7 +27,7 @@ class ThreadCreate(BaseModel):
 class ChatRequest(BaseModel):
     """Incoming user chat turn request."""
 
-    thread_id: Optional[uuid.UUID] = Field(
+    thread_id: uuid.UUID | None = Field(
         default=None,
         description="Target thread UUID. If None, a new thread is automatically created.",
     )
@@ -75,15 +74,15 @@ class ProtocolPassage(BaseModel):
     )
     section_header: str = Field(description="Exact section title or criterion label")
     chunk_text: str = Field(description="Verbatim protocol passage text")
-    similarity: Optional[float] = Field(
+    similarity: float | None = Field(
         default=None,
         description="Raw cosine similarity (1 - cosine_distance) for abstention filtering",
     )
-    last_update_posted_date: Optional[date] = Field(
+    last_update_posted_date: date | None = Field(
         default=None,
         description="Protocol amendment date for evidence verification",
     )
-    brief_title: Optional[str] = Field(
+    brief_title: str | None = Field(
         default=None,
         description="Brief clinical trial title for display",
     )

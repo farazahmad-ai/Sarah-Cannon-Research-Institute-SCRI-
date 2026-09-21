@@ -18,14 +18,12 @@ Session ownership (D-3 / D-4):
     - post_session: persist_turn → commit → close  (guarded by BaseException)
 """
 
-from collections.abc import AsyncGenerator
 import json
 import logging
-from typing import Any, Dict, List
 import uuid
+from collections.abc import AsyncGenerator
 
 import openai
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.assistant.schemas import ChatRequest, ProtocolPassage
 from app.auth.jwt import AuthenticatedUser
@@ -39,7 +37,7 @@ from app.database.chats import (
 )
 from app.database.models import ChatMessage
 from app.database.session import async_session_factory
-from app.retrieval.hybrid import retrieve_protocols
+from app.retrieval.hybrid import DEFAULT_MIN_SIMILARITY, retrieve_protocols
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +67,7 @@ def _estimate_tokens(text: str) -> int:
     return int(len(text.split()) * 1.3)
 
 
-def _trim_history(history: List[ChatMessage]) -> List[ChatMessage]:
+def _trim_history(history: list[ChatMessage]) -> list[ChatMessage]:
     """Return the most-recent tail of history that fits within token and count budgets.
 
     We enforce both a message count cap (_MAX_HISTORY_MESSAGES) and a soft token
@@ -92,10 +90,10 @@ def _trim_history(history: List[ChatMessage]) -> List[ChatMessage]:
 
 
 def build_openai_messages(
-    history: List[ChatMessage],
-    passages: List[ProtocolPassage],
+    history: list[ChatMessage],
+    passages: list[ProtocolPassage],
     user_message: str,
-) -> List[Dict[str, str]]:
+) -> list[dict[str, str]]:
     """Assemble the OpenAI messages array for chat completion with grounded passages."""
     system = {
         "role": "system",
@@ -143,8 +141,8 @@ async def stream_chat_turn(
     # connection is held while the LLM streams (D-4).
     # ------------------------------------------------------------------
     thread_id: uuid.UUID
-    history: List[ChatMessage]
-    passages: List[ProtocolPassage]
+    history: list[ChatMessage]
+    passages: list[ProtocolPassage]
 
     async with async_session_factory() as pre_session:
         # 1. Guarantee profile exists
@@ -163,7 +161,11 @@ async def stream_chat_turn(
         history = await list_messages(pre_session, thread_id, user_uuid)
 
         # 4. Execute hybrid retrieval inside pre_session before commit/close
-        passages = await retrieve_protocols(pre_session, request.message)
+        passages = await retrieve_protocols(
+            pre_session,
+            request.message,
+            min_similarity=DEFAULT_MIN_SIMILARITY,
+        )
 
         await pre_session.commit()
     # pre_session is now fully closed — connection returned to pool
@@ -181,7 +183,7 @@ async def stream_chat_turn(
     # Stream block: no DB session is open during token delivery.
     # ------------------------------------------------------------------
     stream_error: Exception | None = None
-    collected_text: List[str] = []
+    collected_text: list[str] = []
 
     try:
         stream = await client.chat.completions.create(
