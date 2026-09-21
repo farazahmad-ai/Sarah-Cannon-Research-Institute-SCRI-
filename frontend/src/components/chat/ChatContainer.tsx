@@ -1,9 +1,19 @@
-import { useEffect, useRef, useState } from "react";
-import { Sparkles, FileText, AlertCircle } from "lucide-react";
+/**
+ * Main chat conversation view — messages area + input.
+ *
+ * No top header bar (redundant with sidebar context).
+ * Clean empty state with centered welcome and 3 suggested prompts.
+ * Passes citation data through to ChatMessage for interactive pills.
+ * Prevents navigation race conditions when starting a new session.
+ */
+
+import { useEffect, useRef, useState, useCallback } from "react";
+import { Sparkles, AlertCircle } from "lucide-react";
 import { api } from "@/lib/api";
 import { useChatStream } from "@/lib/useChatStream";
 import { ChatMessage } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
+import type { CitationOut } from "@/lib/api";
 
 interface ChatContainerProps {
   threadId?: string;
@@ -12,23 +22,54 @@ interface ChatContainerProps {
 
 const QUICK_PROMPTS = [
   {
-    title: "Prior Therapy Washout",
+    title: "Prior therapy washout",
     prompt: "What is the prior therapy washout period for study treatment?",
   },
   {
-    title: "Brain Metastases",
+    title: "Brain metastases",
     prompt: "What are the exclusion criteria regarding treated or active brain metastases?",
   },
   {
-    title: "Lab Thresholds (ANC)",
-    prompt: "What are the acceptable baseline lab thresholds for absolute neutrophil count (ANC) and platelets?",
+    title: "Lab thresholds",
+    prompt: "What are the acceptable baseline lab thresholds for ANC and platelets?",
   },
 ];
 
 export function ChatContainer({ threadId, onThreadCreated }: ChatContainerProps) {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  /** Citation data keyed by message ID for interactive pills. */
+  const [citationsByMessage, setCitationsByMessage] = useState<
+    Map<string, CitationOut[]>
+  >(new Map());
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Track thread ID created by the current streaming interaction to prevent wiping messages
+  const justCreatedThreadIdRef = useRef<string | null>(null);
+
+  const handleStreamComplete = useCallback(async (completedThreadId: string) => {
+    try {
+      // Reload history to retrieve verified citations saved by backend
+      const history = await api.chat.messages(completedThreadId);
+      const cMap = new Map<string, CitationOut[]>();
+      for (const m of history) {
+        if (m.citations && m.citations.length > 0) {
+          cMap.set(m.id, m.citations);
+        }
+      }
+      setCitationsByMessage(cMap);
+    } catch (e) {
+      console.error("Failed to load citations on stream complete:", e);
+    }
+  }, []);
+
+  const handleThreadCreated = useCallback(
+    (newId: string) => {
+      justCreatedThreadIdRef.current = newId;
+      onThreadCreated?.(newId);
+    },
+    [onThreadCreated]
+  );
 
   const {
     messages,
@@ -41,16 +82,26 @@ export function ChatContainer({ threadId, onThreadCreated }: ChatContainerProps)
     stop,
   } = useChatStream({
     threadId,
-    onThreadCreated,
+    onThreadCreated: handleThreadCreated,
+    onStreamComplete: handleStreamComplete,
     onError: (err) => {
-      setErrorMsg(err.message || "An error occurred while streaming response.");
+      setErrorMsg(err.message || "An error occurred while streaming.");
     },
   });
 
-  // Load message history when threadId changes
+  // Load message history + citations when threadId changes
   useEffect(() => {
     if (!threadId) {
       setMessages([]);
+      setCitationsByMessage(new Map());
+      justCreatedThreadIdRef.current = null;
+      return;
+    }
+
+    // If this threadId was just created by the current active stream,
+    // do not wipe out the in-flight conversation!
+    if (justCreatedThreadIdRef.current === threadId) {
+      justCreatedThreadIdRef.current = null;
       return;
     }
 
@@ -61,7 +112,17 @@ export function ChatContainer({ threadId, onThreadCreated }: ChatContainerProps)
         setHistoryLoading(true);
         setErrorMsg(null);
         const history = await api.chat.messages(threadId!);
+
         if (isMounted) {
+          // Build citation lookup
+          const cMap = new Map<string, CitationOut[]>();
+          for (const m of history) {
+            if (m.citations && m.citations.length > 0) {
+              cMap.set(m.id, m.citations);
+            }
+          }
+          setCitationsByMessage(cMap);
+
           setMessages(
             history.map((m) => ({
               id: m.id,
@@ -73,22 +134,19 @@ export function ChatContainer({ threadId, onThreadCreated }: ChatContainerProps)
         }
       } catch (err) {
         console.error("Failed to load message history:", err);
-        if (isMounted) {
-          setErrorMsg("Could not load previous message history.");
-        }
+        if (isMounted) setErrorMsg("Could not load previous messages.");
       } finally {
         if (isMounted) setHistoryLoading(false);
       }
     }
 
     loadHistory();
-
     return () => {
       isMounted = false;
     };
   }, [threadId, setMessages]);
 
-  // Auto-scroll to bottom as tokens stream in
+  // Auto-scroll as tokens stream in
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
@@ -99,60 +157,42 @@ export function ChatContainer({ threadId, onThreadCreated }: ChatContainerProps)
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-slate-950 text-slate-100 overflow-hidden">
-      {/* Top Header */}
-      <header className="h-14 border-b border-slate-800/80 px-6 flex items-center justify-between shrink-0 bg-slate-950/80 backdrop-blur">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs font-medium text-slate-300">
-              Active Screening Session
-            </span>
-          </div>
-          <span className="text-slate-600 text-xs">•</span>
-          <span className="text-xs text-slate-400 font-mono">
-            {threadId ? `ID: ${threadId.slice(0, 8)}...` : "New Session"}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2 text-xs text-slate-400">
-          <FileText className="w-3.5 h-3.5 text-sky-400" />
-          <span>ClinicalTrials.gov Grounded</span>
-        </div>
-      </header>
-
-      {/* Messages Scroll Area */}
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 space-y-2 scrollbar-thin scrollbar-thumb-slate-800">
+    <div className="flex-1 flex flex-col h-full bg-void overflow-hidden">
+      {/* Messages scroll area */}
+      <div className="flex-1 overflow-y-auto scrollbar-clinical">
         {historyLoading ? (
-          <div className="h-full flex items-center justify-center text-xs text-slate-500">
-            Loading message turns...
+          <div className="h-full flex items-center justify-center text-[12px] text-fog">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 border-2 border-ash border-t-teal rounded-full animate-spin" />
+              Loading messages...
+            </div>
           </div>
         ) : messages.length === 0 ? (
-          /* Empty state */
-          <div className="h-full flex flex-col items-center justify-center max-w-2xl mx-auto text-center px-4">
-            <div className="w-12 h-12 rounded-2xl bg-sky-600/10 border border-sky-500/20 flex items-center justify-center text-sky-400 mb-4 shadow-inner">
-              <Sparkles className="w-6 h-6" />
+          /* ── Empty State ── */
+          <div className="h-full flex flex-col items-center justify-center max-w-xl mx-auto text-center px-6">
+            <div className="w-10 h-10 rounded-xl bg-teal-dim border border-teal-border flex items-center justify-center text-teal mb-5">
+              <Sparkles className="w-5 h-5" />
             </div>
 
-            <h2 className="text-xl font-semibold text-white tracking-tight">
-              SCRI Clinical Protocol Assistant
+            <h2 className="text-[18px] font-semibold text-cloud tracking-tight">
+              Clinical protocol assistant
             </h2>
-            <p className="text-slate-400 text-sm mt-2 max-w-md leading-relaxed">
-              Screen cancer patients against active clinical trial protocols. Ask plain-English questions regarding washouts, organ function, and biomarker criteria.
+            <p className="text-[13px] text-fog mt-2 max-w-sm leading-relaxed">
+              Ask plain-English questions about clinical trial eligibility criteria, washout periods, and biomarker thresholds.
             </p>
 
-            {/* Quick Prompt Chips */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full mt-8">
+            {/* Suggested prompts */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 w-full mt-7">
               {QUICK_PROMPTS.map((item, idx) => (
                 <button
                   key={idx}
                   onClick={() => handlePromptClick(item.prompt)}
-                  className="flex flex-col items-start p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-sky-500/50 hover:bg-slate-900 text-left transition-all group shadow-xs cursor-pointer"
+                  className="flex flex-col items-start p-3 rounded-lg bg-slate-surface border border-ash hover:border-teal-border text-left transition-all group cursor-pointer"
                 >
-                  <span className="text-xs font-medium text-sky-400 group-hover:text-sky-300">
+                  <span className="text-[11px] font-medium text-teal group-hover:text-teal/80">
                     {item.title}
                   </span>
-                  <span className="text-[11px] text-slate-400 mt-1 line-clamp-2">
+                  <span className="text-[11px] text-fog mt-1 line-clamp-2">
                     {item.prompt}
                   </span>
                 </button>
@@ -160,35 +200,40 @@ export function ChatContainer({ threadId, onThreadCreated }: ChatContainerProps)
             </div>
           </div>
         ) : (
-          /* Render Messages */
-          <div className="max-w-4xl mx-auto w-full">
+          /* ── Message Thread ── */
+          <div className="max-w-3xl mx-auto w-full px-4 md:px-6 py-4">
             {messages.map((m, idx) => {
               const isLastAssistant =
                 idx === messages.length - 1 && m.role === "assistant";
               return (
-                <ChatMessage
-                  key={m.id || idx}
-                  role={m.role as "user" | "assistant"}
-                  content={m.content}
-                  createdAt={m.createdAt ? m.createdAt.toISOString() : undefined}
-                  isStreaming={isLastAssistant && isLoading}
-                />
+                <div key={m.id || idx}>
+                  {idx > 0 && (
+                    <div className="border-t border-ash/40 my-1" />
+                  )}
+                  <ChatMessage
+                    role={m.role as "user" | "assistant"}
+                    content={m.content}
+                    createdAt={m.createdAt ? m.createdAt.toISOString() : undefined}
+                    isStreaming={isLastAssistant && isLoading}
+                    citations={citationsByMessage.get(m.id)}
+                  />
+                </div>
               );
             })}
 
             {errorMsg && (
-              <div className="flex items-center gap-2 p-3 my-3 bg-red-950/60 border border-red-800/60 rounded-xl text-red-300 text-xs">
-                <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+              <div className="flex items-center gap-2 p-3 my-3 bg-danger-dim border border-danger/30 rounded-lg text-danger text-[12px]">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                 <span>{errorMsg}</span>
               </div>
             )}
 
-            <div ref={messagesEndRef} />
+            <div ref={messagesEndRef} className="h-4" />
           </div>
         )}
       </div>
 
-      {/* Bottom Chat Input */}
+      {/* Input area */}
       <ChatInput
         input={input}
         handleInputChange={handleInputChange}

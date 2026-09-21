@@ -1,3 +1,10 @@
+/**
+ * Chat page — top-level layout for /chat and /chat/:threadId.
+ *
+ * Split layout: ThreadSidebar on left, ChatContainer on right.
+ * Uses the void background from Clinical Dusk palette.
+ */
+
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "@/lib/api";
@@ -23,14 +30,14 @@ export function ChatPage() {
       const newThread = await api.chat.createThread();
       navigate(`/chat/${newThread.id}`);
     } catch (err) {
-      console.error("Failed to create new chat thread:", err);
+      console.error("Failed to create thread:", err);
     } finally {
       setIsCreating(false);
     }
   };
 
   return (
-    <div className="h-screen w-screen flex overflow-hidden bg-slate-950 font-sans">
+    <div className="h-screen w-screen flex overflow-hidden bg-void font-sans">
       <ThreadSidebar
         activeThreadId={threadId}
         onSelectThread={handleSelectThread}

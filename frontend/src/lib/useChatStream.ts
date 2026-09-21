@@ -11,12 +11,14 @@ export interface ChatMessageItem {
 interface UseChatStreamOptions {
   threadId?: string;
   onThreadCreated?: (threadId: string) => void;
+  onStreamComplete?: (threadId: string) => void;
   onError?: (err: Error) => void;
 }
 
 export function useChatStream({
   threadId,
   onThreadCreated,
+  onStreamComplete,
   onError,
 }: UseChatStreamOptions = {}) {
   const [messages, setMessages] = useState<ChatMessageItem[]>([]);
@@ -45,7 +47,7 @@ export function useChatStream({
 
       let currentThreadId = threadId;
 
-      // If no thread exists yet, create one first so URL and sidebar synchronize
+      // 1. If no thread exists yet, create one first so URL and sidebar synchronize
       if (!currentThreadId) {
         try {
           const newThread = await api.chat.createThread(trimmed.slice(0, 60));
@@ -103,6 +105,7 @@ export function useChatStream({
           const lines = buffer.split("\n");
           buffer = lines.pop() ?? "";
 
+          let hasNewToken = false;
           for (const line of lines) {
             const trimmedLine = line.trim();
             if (!trimmedLine) continue;
@@ -112,13 +115,7 @@ export function useChatStream({
               try {
                 const token = JSON.parse(trimmedLine.slice(2));
                 accumulatedAssistantText += token;
-                setMessages((prev) =>
-                  prev.map((msg) =>
-                    msg.id === assistantMessageId
-                      ? { ...msg, content: accumulatedAssistantText }
-                      : msg
-                  )
-                );
+                hasNewToken = true;
               } catch (e) {
                 console.error("Error parsing stream token:", trimmedLine, e);
               }
@@ -133,6 +130,22 @@ export function useChatStream({
               }
             }
           }
+
+          // Batch React state update once per read chunk to prevent UI freeze
+          if (hasNewToken) {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessageId
+                  ? { ...msg, content: accumulatedAssistantText }
+                  : msg
+              )
+            );
+          }
+        }
+
+        // Stream completed successfully — notify container to sync saved citations
+        if (currentThreadId) {
+          onStreamComplete?.(currentThreadId);
         }
       } catch (err) {
         if ((err as Error).name !== "AbortError") {
@@ -144,7 +157,7 @@ export function useChatStream({
         abortControllerRef.current = null;
       }
     },
-    [threadId, isLoading, onThreadCreated, onError]
+    [threadId, isLoading, onThreadCreated, onStreamComplete, onError]
   );
 
   const handleSubmit = (e?: React.FormEvent<HTMLFormElement>) => {

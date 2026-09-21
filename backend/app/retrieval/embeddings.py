@@ -30,9 +30,13 @@ _MAX_RETRIES = 5
 _INITIAL_BACKOFF_S = 1.0
 _BACKOFF_MULTIPLIER = 2.0
 
+# In-memory LRU-style cache for repeated query embeddings (e.g. quick prompts)
+_EMBEDDING_CACHE: dict[str, list[float]] = {}
+_MAX_CACHE_SIZE = 500
+
 
 async def embed_texts(texts: list[str]) -> list[list[float]]:
-    """Generate embeddings for a list of texts using batched async API calls.
+    """Generate embeddings for a list of texts using batched async API calls with caching.
 
     Args:
         texts: Plain strings to embed (use chunk.embed_text, not chunk.chunk_text,
@@ -48,15 +52,31 @@ async def embed_texts(texts: list[str]) -> list[list[float]]:
     if not texts:
         return []
 
+    # Check cache first
+    uncached_indices: list[int] = []
+    uncached_texts: list[str] = []
+    result_vectors: list[list[float] | None] = [None] * len(texts)
+
+    for i, t in enumerate(texts):
+        if t in _EMBEDDING_CACHE:
+            result_vectors[i] = _EMBEDDING_CACHE[t]
+        else:
+            uncached_indices.append(i)
+            uncached_texts.append(t)
+
+    # If all were cached, return immediately
+    if not uncached_texts:
+        return [v for v in result_vectors if v is not None]
+
     all_vectors: list[list[float]] = []
-    total_batches = (len(texts) + _BATCH_SIZE - 1) // _BATCH_SIZE
+    total_batches = (len(uncached_texts) + _BATCH_SIZE - 1) // _BATCH_SIZE
 
     async with AsyncOpenAI(
         api_key=settings.effective_api_key,
         base_url=settings.effective_base_url,
     ) as client:
         for batch_idx in range(total_batches):
-            batch = texts[batch_idx * _BATCH_SIZE : (batch_idx + 1) * _BATCH_SIZE]
+            batch = uncached_texts[batch_idx * _BATCH_SIZE : (batch_idx + 1) * _BATCH_SIZE]
             vectors = await _embed_batch_with_retry(client, batch, batch_idx, total_batches)
             all_vectors.extend(vectors)
 
@@ -67,7 +87,17 @@ async def embed_texts(texts: list[str]) -> list[list[float]]:
             f"got {len(all_vectors[0])}. Check OPENAI_EMBEDDING_MODEL in config."
         )
 
-    return all_vectors
+    # Populate cache and results
+    for idx_in_uncached, original_idx in enumerate(uncached_indices):
+        vec = all_vectors[idx_in_uncached]
+        t = uncached_texts[idx_in_uncached]
+        if len(_EMBEDDING_CACHE) >= _MAX_CACHE_SIZE:
+            # Pop oldest key to keep bounded memory
+            _EMBEDDING_CACHE.pop(next(iter(_EMBEDDING_CACHE)))
+        _EMBEDDING_CACHE[t] = vec
+        result_vectors[original_idx] = vec
+
+    return [v for v in result_vectors if v is not None]
 
 
 async def _embed_batch_with_retry(

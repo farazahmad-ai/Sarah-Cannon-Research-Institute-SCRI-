@@ -311,25 +311,34 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
     - FastAPI app factory, CORS middleware, lifespan events, healthcheck route (`GET /health`)
     - Mounts `api_router` from `app.api.router`
 
-- [ ] **5.5 PydanticAI Agent & Grounding (Post-retrieval — Phase 5 proper):**
-  - [ ] File: `backend/app/assistant/deps.py`:
-    - `OncologyAgentDeps` holding DB session, user session, hybrid retriever instance, and settings
-  - [ ] File: `backend/app/assistant/prompts.py`:
-    - Oncology system prompt with strict negative constraints
+- [x] **5.5 PydanticAI Agent & Grounding (Post-retrieval — Phase 5 proper):**
+  - [x] File: `backend/app/assistant/deps.py`:
+    - `OncologyAgentDeps` holding user identity, thread ID, retrieved protocol passages, and settings
+  - [x] File: `backend/app/assistant/prompts.py`:
+    - Oncology clinical system prompt with strict negative constraints
     - Explicit instruction: *"If the protocol does not state a criterion, explicitly state: 'The protocol does not state [X].'"*
     - Mandatory bracketed citation formatting: `[NCTxxxxxxx, Section Title: Criterion #]`
-  - [ ] File: `backend/app/assistant/agent.py`:
-    - PydanticAI agent configuration with `openai/gpt-4o` and structured typed dependencies
-  - [ ] File: `backend/app/grounding/validator.py`:
-    - Post-processing validator ensuring every citation references a chunk that was actually retrieved
-    - Validates verbatim quote matches the source chunk text
-    - Strips or flags any hallucinated or ungrounded claims
+    - Context formatting utilities (`format_protocol_context`, `build_chat_messages`)
+  - [x] File: `backend/app/assistant/agent.py`:
+    - PydanticAI agent configuration with OpenRouter / OpenAI compatibility and dynamic context injection
+  - [x] File: `backend/app/grounding/validator.py`:
+    - `GroundingValidator` parses bracket citations (`[NCT..., Section]`), matches them against retrieved candidate passages, deduplicates, and extracts verbatim quotes
+    - Strips/flags ungrounded citations to guarantee zero hallucination
+    - Persists verified citations to `message_citations` table in short-lived `post_session` (maintaining D-3 / D-4)
+    - Eager-loads citations with `selectinload` in `list_messages` for instant coordinator inspection
 
-- [ ] **5.6 Protocol & Trial Endpoints (for Phase 6.6 Trial Catalog):**
-  - [ ] File: `backend/app/api/trials.py`:
+- [x] **5.6 Protocol & Trial Endpoints (for Phase 6.6 Trial Catalog):**
+  - [x] File: `backend/app/database/trials.py`:
+    - `list_trials()` with category/status filters, ordered by category and NCT ID
+    - `get_trial()` and `get_trial_with_chunks()` with sorted chunk index
+  - [x] File: `backend/app/assistant/schemas.py`:
+    - Added `TrialSummary`, `TrialChunkOut`, `TrialDetail`, `CitationOut`, `MessageCitationCreate` matching frontend `api.ts` contracts
+  - [x] File: `backend/app/api/trials.py`:
     - `GET /api/trials` → list active trials with phase/cancer type filters → `list[TrialSummary]`
     - `GET /api/trials/{nct_id}` → full trial detail with all criteria and eligibility rules → `TrialDetail`
-    - Powers the Phase 6.6 Protocol Viewer / Trial Catalog once the `clinical_trials` table is populated via Phase 3 ingestion.
+  - [x] File: `backend/app/api/router.py`:
+    - Mounted `trials_router` under `/api`
+
 
 ---
 
@@ -378,15 +387,17 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
   - [x] File: `frontend/src/components/chat/ChatMessage.tsx`: User (right-aligned) and assistant (left-aligned) message bubbles with formatted clinical citation pills
   - [x] File: `frontend/src/components/chat/ChatInput.tsx`: Auto-growing textarea, Enter submits / Shift+Enter newline, disabled+spinner when streaming, quick-prompt chips
 
-- [ ] **6.5 Interactive Evidence Inspection & Citation Popovers:**
-  - [ ] File: `frontend/src/components/citations/CitationPill.tsx`: Clickable badge (`[NCT07659782, Exclusion #4]`)
-  - [ ] File: `frontend/src/components/citations/CitationPopover.tsx`: Popover drawer displaying verbatim quote, NCT ID, section header, and protocol amendment date
+- [x] **6.5 Interactive Evidence Inspection & Citation Popovers:**
+  - [x] File: `frontend/src/components/citations/CitationPill.tsx`: Clickable badge (`[NCT07659782, Exclusion #4]`) that toggles protocol popover
+  - [x] File: `frontend/src/components/citations/CitationPopover.tsx`: Popover drawer displaying verbatim quote, NCT ID, section header, and protocol amendment date
+  - [x] File: `frontend/src/components/chat/MarkdownContent.tsx`: Markdown parser and renderer for structured oncology responses (bold, bullet/numbered lists, headings, and seamless `CitationPill` embedding without raw asterisks)
 
-- [ ] **6.6 Protocol Viewer & Trial Catalog:**
-  - [ ] File: `frontend/src/components/trials/TrialCard.tsx`: Trial summary card showing disease category, sponsor, phase, and status
-  - [ ] File: `frontend/src/components/trials/TrialList.tsx`: Filterable catalog of the 25 landmark trials by disease category
-  - [ ] File: `frontend/src/components/trials/TrialDetailDrawer.tsx`: Full protocol viewer drawer for cross-referencing criteria
-  - [ ] File: `frontend/src/pages/Dashboard.tsx`: Main split-screen workspace (chat stream on left, protocol drawer / evidence inspector on right)
+- [x] **6.6 Protocol Viewer & Trial Catalog:**
+  - [x] File: `frontend/src/components/trials/TrialCard.tsx`: Trial summary card showing disease category, sponsor, phase, and status
+  - [x] File: `frontend/src/components/trials/TrialList.tsx`: Filterable catalog of the 25 landmark trials with dynamic category pills, database snake_case matching, and full-text search
+  - [x] File: `frontend/src/components/trials/TrialDetailDrawer.tsx`: Full protocol viewer drawer for cross-referencing criteria and sequential chunk reading
+  - [x] File: `frontend/src/pages/TrialsPage.tsx`: Dedicated trial catalog page accessible via sidebar nav and `/trials` route
+  - [x] File: `frontend/src/context/ThemeContext.tsx` & `frontend/src/index.css`: Dark/Light theme system featuring Clinical Dusk dark mode and ChatGPT-inspired clean white/gray light mode with sidebar toggle
 
 ---
 

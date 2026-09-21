@@ -4,15 +4,20 @@
  * Uses Supabase signInWithPassword. No third-party OAuth or magic links —
  * coordinators authenticate with their SCRI / HCA Healthcare credentials
  * provisioned by an admin directly in the Supabase dashboard.
+ *
+ * Clinical Dusk theme with teal accents.
  */
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
+import { useTheme } from "@/context/ThemeContext";
+import { Beaker, Sun, Moon } from "lucide-react";
 
 export function Login() {
   const { session } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
@@ -48,52 +53,57 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-      {/* Background grid pattern */}
+    <div className="min-h-screen bg-void flex items-center justify-center p-4 relative">
+      {/* Theme toggle in top right */}
+      <div className="absolute top-4 right-4 z-10">
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="p-2 rounded-lg bg-graphite border border-ash text-fog hover:text-cloud hover:bg-ash/40 transition-colors cursor-pointer"
+          title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+        >
+          {theme === "dark" ? (
+            <Sun className="w-4 h-4" />
+          ) : (
+            <Moon className="w-4 h-4" />
+          )}
+        </button>
+      </div>
+      {/* Subtle grid background */}
       <div
-        className="absolute inset-0 opacity-[0.03]"
+        className="absolute inset-0 opacity-[0.02]"
         style={{
           backgroundImage:
-            "linear-gradient(#94a3b8 1px, transparent 1px), linear-gradient(90deg, #94a3b8 1px, transparent 1px)",
-          backgroundSize: "40px 40px",
+            "linear-gradient(var(--fog) 1px, transparent 1px), linear-gradient(90deg, var(--fog) 1px, transparent 1px)",
+          backgroundSize: "48px 48px",
         }}
       />
 
-      <div className="relative w-full max-w-md">
+      <div className="relative w-full max-w-sm">
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-sky-600/20 border border-sky-500/30 mb-4">
-            <svg
-              className="w-7 h-7 text-sky-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0 1 12 15a9.065 9.065 0 0 0-6.23-.693L5 14.5m14.8.8 1.402 1.402c1 1 .03 2.798-1.442 2.798H4.24c-1.47 0-2.44-1.798-1.442-2.798L4.2 15.3"
-              />
-            </svg>
+        <div className="text-center mb-7">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-teal-dim border border-teal-border mb-4">
+            <Beaker className="w-6 h-6 text-teal" />
           </div>
-          <h1 className="text-2xl font-semibold text-white tracking-tight">
-            Oncology Copilot
+          <h1 className="text-[20px] font-semibold text-cloud tracking-tight">
+            SCRI Copilot
           </h1>
-          <p className="text-slate-400 text-sm mt-1">
+          <p className="text-fog text-[12px] mt-1">
             Sarah Cannon Research Institute
           </p>
         </div>
 
         {/* Card */}
-        <div className="bg-slate-900/80 backdrop-blur border border-slate-800 rounded-2xl p-8 shadow-2xl">
-          <h2 className="text-slate-200 font-medium mb-6">Sign in to your account</h2>
+        <div className="bg-graphite border border-ash rounded-xl p-6">
+          <h2 className="text-cloud text-[14px] font-medium mb-5">
+            Sign in to your account
+          </h2>
 
           {/* Error banner */}
           {error && (
-            <div className="flex items-start gap-3 bg-red-950/60 border border-red-800/60 rounded-lg px-4 py-3 mb-5">
+            <div className="flex items-start gap-2.5 bg-danger-dim border border-danger/30 rounded-lg px-3.5 py-2.5 mb-4">
               <svg
-                className="w-4 h-4 text-red-400 mt-0.5 shrink-0"
+                className="w-3.5 h-3.5 text-danger mt-0.5 shrink-0"
                 fill="currentColor"
                 viewBox="0 0 20 20"
               >
@@ -103,15 +113,15 @@ export function Login() {
                   clipRule="evenodd"
                 />
               </svg>
-              <p className="text-red-300 text-sm">{error}</p>
+              <p className="text-danger text-[12px]">{error}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-3.5">
             <div>
               <label
                 htmlFor="email"
-                className="block text-sm font-medium text-slate-300 mb-1.5"
+                className="block text-[12px] font-medium text-fog mb-1.5"
               >
                 Institutional email
               </label>
@@ -123,14 +133,14 @@ export function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@scri.com"
-                className="w-full bg-slate-800/60 border border-slate-700 rounded-lg px-3.5 py-2.5 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition"
+                className="w-full bg-slate-surface border border-ash rounded-lg px-3 py-2 text-cloud placeholder-fog/40 text-[13px] focus:outline-none focus:ring-1 focus:ring-teal-border focus:border-teal-border transition"
               />
             </div>
 
             <div>
               <label
                 htmlFor="password"
-                className="block text-sm font-medium text-slate-300 mb-1.5"
+                className="block text-[12px] font-medium text-fog mb-1.5"
               >
                 Password
               </label>
@@ -142,18 +152,18 @@ export function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-slate-800/60 border border-slate-700 rounded-lg px-3.5 py-2.5 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition"
+                className="w-full bg-slate-surface border border-ash rounded-lg px-3 py-2 text-cloud placeholder-fog/40 text-[13px] focus:outline-none focus:ring-1 focus:ring-teal-border focus:border-teal-border transition"
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-sky-600 hover:bg-sky-500 disabled:bg-sky-800 disabled:cursor-not-allowed text-white font-medium rounded-lg py-2.5 text-sm transition-colors flex items-center justify-center gap-2 mt-2"
+              className="w-full bg-teal hover:bg-teal/85 disabled:opacity-40 disabled:cursor-not-allowed text-void font-medium rounded-lg py-2.5 text-[13px] transition-colors flex items-center justify-center gap-2 mt-1 cursor-pointer"
             >
               {loading ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <div className="w-3.5 h-3.5 border-2 border-void/30 border-t-void rounded-full animate-spin" />
                   Signing in…
                 </>
               ) : (
@@ -164,7 +174,7 @@ export function Login() {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-slate-600 text-xs mt-6">
+        <p className="text-center text-fog/40 text-[10px] mt-5 leading-relaxed">
           For authorized SCRI clinical research staff only.
           <br />
           Contact your administrator to request access.

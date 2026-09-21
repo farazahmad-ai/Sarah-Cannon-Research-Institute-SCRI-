@@ -1,10 +1,47 @@
+/**
+ * Chat message row — flat layout without chat bubbles.
+ *
+ * User messages: slightly dimmer, left-aligned with user icon.
+ * Assistant messages: full contrast, left-aligned with bot icon.
+ * Citations: interactive CitationPill components that open popovers.
+ */
+
 import { Bot, User } from "lucide-react";
+import type { CitationData } from "@/components/citations/CitationPill";
+import type { CitationOut } from "@/lib/api";
+import { MarkdownContent } from "./MarkdownContent";
 
 export interface MessageProps {
   role: "user" | "assistant" | "system";
   content: string;
   createdAt?: string;
   isStreaming?: boolean;
+  /** Structured citation data from backend for this message. */
+  citations?: CitationOut[];
+}
+
+/**
+ * Build a lookup from bracket label → CitationData so pills can match
+ * the inline text like "[NCT07659782, Exclusion #4]" to its metadata.
+ */
+function buildCitationMap(
+  citations: CitationOut[] | undefined
+): Map<string, CitationData> {
+  const map = new Map<string, CitationData>();
+  if (!citations) return map;
+
+  for (const c of citations) {
+    // Normalize label format to match what the LLM typically produces
+    const key = `[${c.nct_id}, ${c.section_header}]`;
+    map.set(key, {
+      nct_id: c.nct_id,
+      section_header: c.section_header,
+      verbatim_quote: c.verbatim_quote,
+      citation_index: c.citation_index,
+      created_at: c.created_at,
+    });
+  }
+  return map;
 }
 
 export function ChatMessage({
@@ -12,91 +49,59 @@ export function ChatMessage({
   content,
   createdAt,
   isStreaming = false,
+  citations,
 }: MessageProps) {
   const isUser = role === "user";
-
-  // Formats inline bracketed citations [NCTxxxx, Section] with clinical badge styling
-  const renderFormattedContent = (text: string) => {
-    // Regex matching [NCT..., ...] citations
-    const citationRegex = /\[(NCT\d{8}[^\]]*)\]/g;
-    const parts = [];
-    let lastIndex = 0;
-    let match;
-
-    while ((match = citationRegex.exec(text)) !== null) {
-      if (match.index > lastIndex) {
-        parts.push(text.slice(lastIndex, match.index));
-      }
-      parts.push(
-        <span
-          key={match.index}
-          className="inline-flex items-center gap-1 font-mono text-xs text-sky-300 bg-sky-950/80 border border-sky-800/60 px-1.5 py-0.5 rounded mx-1 my-0.5 shadow-xs select-all"
-        >
-          {match[0]}
-        </span>
-      );
-      lastIndex = match.index + match[0].length;
-    }
-
-    if (lastIndex < text.length) {
-      parts.push(text.slice(lastIndex));
-    }
-
-    return parts.length > 0 ? parts : text;
-  };
-
-  if (isUser) {
-    return (
-      <div className="flex justify-end mb-4 group">
-        <div className="flex items-end gap-2 max-w-[85%] md:max-w-[75%]">
-          <div className="flex flex-col items-end">
-            <div className="bg-sky-600 text-white rounded-2xl rounded-br-xs px-4 py-3 shadow-md text-sm leading-relaxed whitespace-pre-wrap select-text">
-              {content}
-            </div>
-            {createdAt && (
-              <span className="text-[11px] text-slate-500 mt-1 mr-1">
-                {new Date(createdAt).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </span>
-            )}
-          </div>
-          <div className="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 shrink-0 mb-4">
-            <User className="w-4 h-4" />
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const citationMap = buildCitationMap(citations);
 
   return (
-    <div className="flex justify-start mb-5 group">
-      <div className="flex items-start gap-3 max-w-[90%] md:max-w-[80%]">
-        <div className="w-8 h-8 rounded-xl bg-sky-950/90 border border-sky-800/60 flex items-center justify-center text-sky-400 shrink-0 shadow-sm mt-0.5">
-          <Bot className="w-4 h-4" />
-        </div>
-        <div className="flex-1 flex flex-col items-start">
-          <div className="w-full bg-slate-900/90 border border-slate-800 rounded-2xl rounded-tl-xs p-4 shadow-sm text-slate-200 text-sm leading-relaxed whitespace-pre-wrap select-text">
-            {renderFormattedContent(content)}
-            {isStreaming && (
-              <span className="inline-block w-2 h-4 ml-1 bg-sky-400 animate-pulse align-middle rounded-xs" />
-            )}
-          </div>
-          <div className="flex items-center gap-2 mt-1 ml-1">
-            <span className="text-[11px] font-medium text-slate-400">
-              SCRI Protocol Copilot
+    <div className={`flex gap-3 py-4 ${isUser ? "opacity-90" : ""}`}>
+      {/* Role icon */}
+      <div
+        className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
+          isUser
+            ? "bg-ash text-fog"
+            : "bg-teal-dim border border-teal-border text-teal"
+        }`}
+      >
+        {isUser ? (
+          <User className="w-3.5 h-3.5" />
+        ) : (
+          <Bot className="w-3.5 h-3.5" />
+        )}
+      </div>
+
+      {/* Content column */}
+      <div className="flex-1 min-w-0">
+        {/* Role label + timestamp */}
+        <div className="flex items-center gap-2 mb-1.5">
+          <span
+            className={`text-[11px] font-medium ${
+              isUser ? "text-fog" : "text-teal"
+            }`}
+          >
+            {isUser ? "You" : "SCRI Copilot"}
+          </span>
+          {createdAt && (
+            <span className="text-[10px] text-fog/60">
+              {new Date(createdAt).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
             </span>
-            {createdAt && (
-              <span className="text-[11px] text-slate-500">
-                •{" "}
-                {new Date(createdAt).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </span>
-            )}
-          </div>
+          )}
+        </div>
+
+        {/* Message body */}
+        <div className="text-[13px] leading-relaxed text-cloud select-text">
+          {isUser ? (
+            <p className="whitespace-pre-wrap text-cloud/90">{content}</p>
+          ) : (
+            <MarkdownContent content={content} citationMap={citationMap} />
+          )}
+          {isStreaming && (
+            <span className="inline-block w-1.5 h-3.5 ml-1 bg-teal animate-pulse align-middle rounded-sm" />
+          )}
         </div>
       </div>
     </div>

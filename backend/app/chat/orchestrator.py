@@ -25,6 +25,9 @@ from collections.abc import AsyncGenerator
 
 import openai
 
+from app.assistant.prompts import (
+    build_chat_messages,
+)
 from app.assistant.schemas import ChatRequest, ProtocolPassage
 from app.auth.jwt import AuthenticatedUser
 from app.config import settings
@@ -37,6 +40,7 @@ from app.database.chats import (
 )
 from app.database.models import ChatMessage
 from app.database.session import async_session_factory
+from app.grounding.validator import GroundingValidator
 from app.retrieval.hybrid import DEFAULT_MIN_SIMILARITY, retrieve_protocols
 
 logger = logging.getLogger(__name__)
@@ -48,18 +52,6 @@ _MAX_HISTORY_MESSAGES = 10
 
 # Soft token ceiling for conversation history (~8 000 tokens ≈ 6 000 words)
 _MAX_HISTORY_TOKENS = 8000
-
-SYSTEM_PROMPT = (
-    "You are an expert oncology clinical trial assistant for Sarah Cannon Research Institute (SCRI). "
-    "Your mission is to provide accurate, grounded answers to clinical research coordinators "
-    "and investigators evaluating patient eligibility for cancer clinical trials.\n\n"
-    "CRITICAL RULES:\n"
-    "1. ABSOLUTE GROUNDING: Every factual claim must cite a specific protocol section using bracket notation: "
-    "[NCT ID, Section Header] (e.g. [NCT07659782, Eligibility: Exclusion Criterion #4]).\n"
-    "2. ZERO HALLUCINATION: Never fabricate eligibility criteria, lab thresholds, or washout periods. "
-    "If the provided protocol context does not contain the answer, explicitly state: 'The protocol does not state [X].' "
-    "Never guess, extrapolate, or generalize from other medical literature."
-)
 
 
 def _estimate_tokens(text: str) -> int:
@@ -95,31 +87,8 @@ def build_openai_messages(
     user_message: str,
 ) -> list[dict[str, str]]:
     """Assemble the OpenAI messages array for chat completion with grounded passages."""
-    system = {
-        "role": "system",
-        "content": SYSTEM_PROMPT,
-    }
-    prior = [{"role": m.role, "content": m.content} for m in _trim_history(history)]
+    return build_chat_messages(_trim_history(history), passages, user_message)
 
-    if passages:
-        formatted_passages = []
-        for idx, p in enumerate(passages, start=1):
-            formatted_passages.append(
-                f"[Passage {idx} | {p.nct_id}, {p.section_header}]\n{p.chunk_text}"
-            )
-        context_block = "\n\n".join(formatted_passages)
-        user_content = f"Protocol Context:\n{context_block}\n\nQuestion: {user_message}"
-    else:
-        user_content = (
-            "Protocol Context: No matching protocol passages retrieved for this query.\n\n"
-            f"Question: {user_message}"
-        )
-
-    user = {
-        "role": "user",
-        "content": user_content,
-    }
-    return [system, *prior, user]
 
 
 async def stream_chat_turn(
@@ -221,8 +190,20 @@ async def stream_chat_turn(
         assistant_text = f"[Response interrupted: {stream_error}]"
 
     try:
+        # Validate and extract grounded citations against the retrieved passages
+        verified_citations = GroundingValidator.validate_citations(
+            assistant_text,
+            passages,
+        )
+
         async with async_session_factory() as post_session:
-            await persist_turn(post_session, thread_id, request.message, assistant_text)
+            await persist_turn(
+                post_session,
+                thread_id,
+                request.message,
+                assistant_text,
+                citations=verified_citations,
+            )
             await post_session.commit()
     except BaseException as exc:
         logger.error(
@@ -231,3 +212,4 @@ async def stream_chat_turn(
             exc,
         )
         # Do not re-raise — log and move on.
+

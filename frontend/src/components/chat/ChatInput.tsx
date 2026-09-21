@@ -1,3 +1,10 @@
+/**
+ * Chat input — auto-growing textarea with send/stop controls.
+ *
+ * Minimal design: dark field blending with the void background,
+ * teal focus ring, simplified footer. Enter submits, Shift+Enter newlines.
+ */
+
 import React, { useEffect, useRef } from "react";
 import { ArrowUp, Square } from "lucide-react";
 
@@ -16,17 +23,17 @@ export function ChatInput({
   handleSubmit,
   isLoading,
   stop,
-  placeholder = "Ask a protocol eligibility question (e.g., washout periods, biomarker thresholds, ANC limits)...",
+  placeholder = "Ask about eligibility criteria, washout periods, biomarkers...",
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-resize textarea height as content expands
+  // Auto-resize textarea as content grows
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
       textareaRef.current.style.height = `${Math.min(
         textareaRef.current.scrollHeight,
-        180
+        160
       )}px`;
     }
   }, [input]);
@@ -35,11 +42,8 @@ export function ChatInput({
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (input.trim() && !isLoading) {
-        // Trigger submit
         const form = e.currentTarget.form;
-        if (form) {
-          form.requestSubmit();
-        }
+        if (form) form.requestSubmit();
       }
     }
   };
@@ -47,9 +51,9 @@ export function ChatInput({
   return (
     <form
       onSubmit={handleSubmit}
-      className="relative flex flex-col w-full max-w-4xl mx-auto px-4 pb-4"
+      className="relative flex flex-col w-full max-w-3xl mx-auto px-4 pb-4 pt-2"
     >
-      <div className="relative flex items-end bg-slate-900/90 border border-slate-800 rounded-2xl p-2 shadow-lg focus-within:border-sky-500/60 focus-within:ring-1 focus-within:ring-sky-500/30 transition-all">
+      <div className="relative flex items-end bg-slate-surface border border-ash rounded-xl p-1.5 focus-within:border-teal-border focus-within:ring-1 focus-within:ring-teal-border/30 transition-all">
         <textarea
           ref={textareaRef}
           value={input}
@@ -58,40 +62,35 @@ export function ChatInput({
           rows={1}
           placeholder={placeholder}
           disabled={isLoading}
-          className="w-full bg-transparent text-slate-100 placeholder:text-slate-500 text-sm resize-none px-3 py-2 focus:outline-hidden min-h-[44px] max-h-[180px] leading-relaxed"
+          className="w-full bg-transparent text-cloud placeholder:text-fog/50 text-[13px] resize-none px-3 py-2 focus:outline-none min-h-[40px] max-h-[160px] leading-relaxed"
         />
 
-        <div className="flex items-center gap-1.5 pb-1 pr-1 shrink-0">
+        <div className="flex items-center pb-1 pr-1 shrink-0">
           {isLoading ? (
             <button
               type="button"
               onClick={stop}
-              className="flex items-center justify-center w-8 h-8 rounded-xl bg-red-950/80 border border-red-800/80 text-red-300 hover:bg-red-900 transition-colors shadow-xs"
+              className="flex items-center justify-center w-7 h-7 rounded-lg bg-danger-dim border border-danger/30 text-danger hover:bg-danger/20 transition-colors cursor-pointer"
               title="Stop generating"
             >
-              <Square className="w-3.5 h-3.5 fill-current" />
+              <Square className="w-3 h-3 fill-current" />
             </button>
           ) : (
             <button
               type="submit"
               disabled={!input.trim() || isLoading}
-              className="flex items-center justify-center w-8 h-8 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-40 disabled:hover:bg-sky-600 text-white transition-all shadow-xs disabled:cursor-not-allowed"
-              title="Send question (Enter)"
+              className="flex items-center justify-center w-7 h-7 rounded-lg bg-teal hover:bg-teal/85 disabled:opacity-30 disabled:hover:bg-teal text-void transition-all disabled:cursor-not-allowed cursor-pointer"
+              title="Send (Enter)"
             >
-              <ArrowUp className="w-4 h-4" />
+              <ArrowUp className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
       </div>
 
-      <div className="flex items-center justify-between text-[11px] text-slate-500 px-3 mt-2">
-        <span>
-          Answers are strictly grounded in unclassified ClinicalTrials.gov protocols.
-        </span>
-        <span className="hidden sm:inline text-slate-600">
-          Press <kbd className="px-1 py-0.5 bg-slate-800 rounded text-slate-400">Enter</kbd> to send, <kbd className="px-1 py-0.5 bg-slate-800 rounded text-slate-400">Shift+Enter</kbd> for newline
-        </span>
-      </div>
+      <p className="text-[10px] text-fog/50 text-center mt-2">
+        Answers are grounded in ClinicalTrials.gov protocols. Not medical advice.
+      </p>
     </form>
   );
 }

@@ -1,7 +1,25 @@
+/**
+ * Sidebar — session list, trial catalog navigation, theme toggle, and user profile.
+ *
+ * Clinical Dusk theme with graphite background and teal accents.
+ * Active thread indicated by a left border accent.
+ */
+
 import { useEffect, useState } from "react";
-import { MessageSquare, Plus, Trash2, LogOut, ShieldAlert } from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
+import {
+  MessageSquare,
+  Plus,
+  Trash2,
+  LogOut,
+  FlaskConical,
+  Beaker,
+  Sun,
+  Moon,
+} from "lucide-react";
 import { api, type ThreadOut } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { useTheme } from "@/context/ThemeContext";
 
 interface ThreadSidebarProps {
   activeThreadId?: string;
@@ -17,9 +35,14 @@ export function ThreadSidebar({
   isCreating = false,
 }: ThreadSidebarProps) {
   const { user, signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [threads, setThreads] = useState<ThreadOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const isTrialsPage = location.pathname === "/trials";
 
   const fetchThreads = async () => {
     try {
@@ -27,7 +50,7 @@ export function ThreadSidebar({
       const data = await api.chat.threads();
       setThreads(data);
     } catch (err) {
-      console.error("Failed to fetch chat threads:", err);
+      console.error("Failed to fetch threads:", err);
     } finally {
       setLoading(false);
     }
@@ -39,17 +62,13 @@ export function ThreadSidebar({
 
   const handleDelete = async (e: React.MouseEvent, threadId: string) => {
     e.stopPropagation();
-    if (!confirm("Are you sure you want to delete this screening session?")) {
-      return;
-    }
+    if (!confirm("Delete this screening session?")) return;
 
     try {
       setDeletingId(threadId);
       await api.chat.deleteThread(threadId);
       setThreads((prev) => prev.filter((t) => t.id !== threadId));
-      if (activeThreadId === threadId) {
-        onSelectThread("");
-      }
+      if (activeThreadId === threadId) onSelectThread("");
     } catch (err) {
       console.error("Failed to delete thread:", err);
     } finally {
@@ -57,32 +76,35 @@ export function ThreadSidebar({
     }
   };
 
+  function relativeTime(dateStr: string): string {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const minutes = Math.floor(diff / 60_000);
+    if (minutes < 1) return "just now";
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `${days}d ago`;
+    return new Date(dateStr).toLocaleDateString([], {
+      month: "short",
+      day: "numeric",
+    });
+  }
+
   return (
-    <aside className="w-72 md:w-80 bg-slate-950 border-r border-slate-800 flex flex-col h-full shrink-0 select-none">
-      {/* Header */}
-      <div className="p-4 border-b border-slate-800/80">
-        <div className="flex items-center gap-2.5 mb-4">
-          <div className="w-8 h-8 rounded-xl bg-sky-600/20 border border-sky-500/30 flex items-center justify-center text-sky-400">
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0 1 12 15a9.065 9.065 0 0 0-6.23-.693L5 14.5m14.8.8 1.402 1.402c1 1 .03 2.798-1.442 2.798H4.24c-1.47 0-2.44-1.798-1.442-2.798L4.2 15.3"
-              />
-            </svg>
+    <aside className="w-64 bg-graphite border-r border-ash flex flex-col h-full shrink-0 select-none">
+      {/* ── Brand + New Session ── */}
+      <div className="p-3.5 pb-3">
+        <div className="flex items-center gap-2 mb-3.5">
+          <div className="w-7 h-7 rounded-lg bg-teal-dim border border-teal-border flex items-center justify-center text-teal">
+            <Beaker className="w-3.5 h-3.5" />
           </div>
           <div>
-            <h1 className="font-semibold text-white text-sm tracking-tight leading-none">
+            <h1 className="font-semibold text-cloud text-[13px] tracking-tight leading-none">
               SCRI Copilot
             </h1>
-            <p className="text-[11px] text-slate-400 mt-1">
-              Oncology Protocol Assistant
+            <p className="text-[10px] text-fog mt-0.5">
+              Protocol assistant
             </p>
           </div>
         </div>
@@ -90,96 +112,122 @@ export function ThreadSidebar({
         <button
           onClick={onCreateThread}
           disabled={isCreating}
-          className="w-full flex items-center justify-center gap-2 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-medium text-xs px-3.5 py-2.5 rounded-xl transition-all shadow-sm cursor-pointer disabled:cursor-not-allowed"
+          className="w-full flex items-center justify-center gap-1.5 bg-teal hover:bg-teal/85 disabled:opacity-40 text-void font-medium text-[12px] px-3 py-2 rounded-lg transition-all cursor-pointer disabled:cursor-not-allowed"
         >
-          <Plus className="w-4 h-4" />
-          <span>New Screening Session</span>
+          <Plus className="w-3.5 h-3.5" />
+          <span>New session</span>
         </button>
       </div>
 
-      {/* Thread list */}
-      <div className="flex-1 overflow-y-auto px-2 py-3 space-y-1 scrollbar-thin scrollbar-thumb-slate-800">
-        <div className="px-2 pb-1 text-[11px] font-medium text-slate-500 uppercase tracking-wider">
-          Screening History
+      {/* ── Thread List ── */}
+      <div className="flex-1 overflow-y-auto px-1.5 pb-2 scrollbar-clinical">
+        <div className="px-2 py-1.5 text-[10px] font-medium text-fog">
+          Sessions
         </div>
 
         {loading && threads.length === 0 ? (
-          <div className="p-4 text-center text-xs text-slate-500">
-            Loading sessions...
+          <div className="px-3 py-4 text-center text-[11px] text-fog/60">
+            Loading...
           </div>
         ) : threads.length === 0 ? (
-          <div className="p-4 text-center text-xs text-slate-500">
-            No past sessions. Click "New Screening Session" to start.
+          <div className="px-3 py-4 text-center text-[11px] text-fog/60">
+            No sessions yet
           </div>
         ) : (
-          threads.map((thread) => {
-            const isActive = thread.id === activeThreadId;
-            return (
-              <div
-                key={thread.id}
-                onClick={() => onSelectThread(thread.id)}
-                className={`group relative flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl cursor-pointer transition-colors text-xs ${
-                  isActive
-                    ? "bg-slate-800/90 text-white font-medium border border-sky-500/30 shadow-xs"
-                    : "text-slate-400 hover:bg-slate-900 hover:text-slate-200 border border-transparent"
-                }`}
-              >
-                <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                  <MessageSquare
-                    className={`w-4 h-4 shrink-0 ${
-                      isActive ? "text-sky-400" : "text-slate-500"
-                    }`}
-                  />
-                  <div className="truncate flex-1">
-                    <div className="truncate">{thread.title}</div>
-                    <div className="text-[10px] text-slate-500 font-normal mt-0.5">
-                      {new Date(thread.created_at).toLocaleDateString([], {
-                        month: "short",
-                        day: "numeric",
-                      })}
+          <div className="space-y-0.5">
+            {threads.map((thread) => {
+              const isActive = thread.id === activeThreadId;
+              return (
+                <div
+                  key={thread.id}
+                  onClick={() => onSelectThread(thread.id)}
+                  className={`group relative flex items-center justify-between gap-1.5 px-2.5 py-2 rounded-md cursor-pointer transition-colors text-[12px] ${
+                    isActive
+                      ? "bg-teal-dim/50 text-cloud border-l-2 border-l-teal ml-0"
+                      : "text-fog hover:bg-ash/30 hover:text-cloud border-l-2 border-l-transparent"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <MessageSquare
+                      className={`w-3.5 h-3.5 shrink-0 ${
+                        isActive ? "text-teal" : "text-fog/60"
+                      }`}
+                    />
+                    <div className="truncate flex-1 min-w-0">
+                      <div className="truncate text-[12px]">{thread.title}</div>
+                      <div className="text-[10px] text-fog/50 mt-0.5">
+                        {relativeTime(thread.created_at)}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <button
-                  type="button"
-                  onClick={(e) => handleDelete(e, thread.id)}
-                  disabled={deletingId === thread.id}
-                  className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-slate-500 hover:text-red-400 hover:bg-slate-800/60 transition-all shrink-0"
-                  title="Delete session"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            );
-          })
+                  <button
+                    type="button"
+                    onClick={(e) => handleDelete(e, thread.id)}
+                    disabled={deletingId === thread.id}
+                    className="opacity-0 group-hover:opacity-100 p-1 rounded text-fog/50 hover:text-danger transition-all shrink-0"
+                    title="Delete session"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
 
-      {/* Footer / User Profile */}
-      <div className="p-3 border-t border-slate-800/80 bg-slate-950/80 flex items-center justify-between">
-        <div className="flex items-center gap-2.5 min-w-0 pr-2">
-          <div className="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-sky-400 text-xs font-semibold shrink-0">
-            {user?.email?.charAt(0).toUpperCase() ?? "C"}
+      {/* ── Trial Catalog Nav ── */}
+      <div className="px-1.5 pb-1">
+        <button
+          type="button"
+          onClick={() => navigate("/trials")}
+          className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-[12px] transition-colors cursor-pointer ${
+            isTrialsPage
+              ? "bg-teal-dim/50 text-teal"
+              : "text-fog hover:text-cloud hover:bg-ash/30"
+          }`}
+        >
+          <FlaskConical className="w-3.5 h-3.5" />
+          <span>Trial catalog</span>
+        </button>
+      </div>
+
+      {/* ── User Footer with Theme Toggle ── */}
+      <div className="p-2.5 border-t border-ash flex items-center justify-between">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-6 h-6 rounded-md bg-ash flex items-center justify-center text-fog text-[10px] font-semibold shrink-0">
+            {user?.email?.charAt(0).toUpperCase() ?? "?"}
           </div>
-          <div className="min-w-0">
-            <div className="text-xs font-medium text-slate-200 truncate">
-              {user?.email ?? "Coordinator"}
-            </div>
-            <div className="flex items-center gap-1 text-[10px] text-sky-400 font-medium">
-              <ShieldAlert className="w-3 h-3" />
-              <span>Verified CRC</span>
-            </div>
-          </div>
+          <span className="text-[11px] text-fog truncate">
+            {user?.email ?? "—"}
+          </span>
         </div>
 
-        <button
-          onClick={() => signOut()}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-900 transition-colors shrink-0"
-          title="Sign out"
-        >
-          <LogOut className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1 shrink-0">
+          {/* Theme toggle */}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="p-1 rounded text-fog/50 hover:text-cloud hover:bg-ash/40 transition-colors cursor-pointer"
+            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {theme === "dark" ? (
+              <Sun className="w-3.5 h-3.5" />
+            ) : (
+              <Moon className="w-3.5 h-3.5" />
+            )}
+          </button>
+
+          {/* Sign out */}
+          <button
+            onClick={() => signOut()}
+            className="p-1 rounded text-fog/50 hover:text-danger transition-colors cursor-pointer"
+            title="Sign out"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
     </aside>
   );

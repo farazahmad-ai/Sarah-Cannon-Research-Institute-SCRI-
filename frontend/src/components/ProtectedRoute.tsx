@@ -17,10 +17,10 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="min-h-screen bg-void flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 rounded-full border-2 border-sky-500 border-t-transparent animate-spin" />
-          <p className="text-slate-500 text-sm">Verifying session…</p>
+          <div className="w-6 h-6 rounded-full border-2 border-ash border-t-teal animate-spin" />
+          <p className="text-fog text-[12px]">Verifying session…</p>
         </div>
       </div>
     );

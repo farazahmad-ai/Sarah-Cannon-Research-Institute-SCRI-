@@ -97,6 +97,17 @@ export interface TrialSummary {
   primary_completion_date: string | null;
 }
 
+/** Structured protocol chunk from the trial chunking pipeline. */
+export interface TrialChunkOut {
+  id: string;
+  nct_id: string;
+  section_type: string;
+  section_title: string;
+  chunk_index: number;
+  chunk_text: string;
+  token_count: number;
+}
+
 /** Full protocol detail returned by GET /api/trials/:nct_id */
 export interface TrialDetail extends TrialSummary {
   official_title: string | null;
@@ -104,6 +115,8 @@ export interface TrialDetail extends TrialSummary {
   arms: Record<string, unknown>[] | null;
   primary_outcomes: Record<string, unknown>[] | null;
   last_update_posted_date: string | null;
+  conditions: string[] | null;
+  chunks: TrialChunkOut[];
 }
 
 /** Identity returned by GET /api/me — mirrors the backend AuthenticatedUser model. */
@@ -120,6 +133,18 @@ export interface ThreadOut {
   created_at: string;
 }
 
+/** Grounded citation attached to an assistant message. */
+export interface CitationOut {
+  id: string;
+  message_id: string;
+  chunk_id: string | null;
+  nct_id: string;
+  section_header: string;
+  verbatim_quote: string;
+  citation_index: number;
+  created_at: string | null;
+}
+
 /** Turn within a screening chat thread. */
 export interface MessageOut {
   id: string;
@@ -127,6 +152,7 @@ export interface MessageOut {
   role: "user" | "assistant";
   content: string;
   created_at: string;
+  citations: CitationOut[];
 }
 
 export const api = {

@@ -5,181 +5,129 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * Clinical Dusk — SCRI Oncology Copilot theme system.
+ *
+ * Dark mode: restrained dark palette with teal accent.
+ * Light mode: ChatGPT-style clean whites and warm grays.
+ */
+
+/* ── Dark Mode (default) ── */
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: oklch(0.922 0 0);
-  --code-bg: #f4f3ec;
-  --accent: oklch(0.97 0 0);
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  --void: #0a0a0f;
+  --graphite: #111117;
+  --slate-surface: #1a1a24;
+  --ash: #2a2a36;
+  --fog: #6b6b80;
+  --cloud: #e0e0ea;
+  --teal: #2dd4a8;
+  --teal-dim: rgba(45, 212, 168, 0.12);
+  --teal-border: rgba(45, 212, 168, 0.25);
+  --danger: #f87171;
+  --danger-dim: rgba(248, 113, 113, 0.12);
+  --amber: #fbbf24;
+  --emerald: #34d399;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  --sans: 'Geist Variable', system-ui, -apple-system, sans-serif;
+  --mono: 'Geist Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.55;
+  color-scheme: dark;
+  color: var(--cloud);
+  background: var(--void);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
-
-  --background: oklch(1 0 0);
-
-  --foreground: oklch(0.145 0 0);
-
-  --card: oklch(1 0 0);
-
-  --card-foreground: oklch(0.145 0 0);
-
-  --popover: oklch(1 0 0);
-
-  --popover-foreground: oklch(0.145 0 0);
-
-  --primary: oklch(0.205 0 0);
-
-  --primary-foreground: oklch(0.985 0 0);
-
-  --secondary: oklch(0.97 0 0);
-
-  --secondary-foreground: oklch(0.205 0 0);
-
-  --muted: oklch(0.97 0 0);
-
-  --muted-foreground: oklch(0.556 0 0);
-
-  --accent-foreground: oklch(0.205 0 0);
-
-  --destructive: oklch(0.577 0.245 27.325);
-
-  --input: oklch(0.922 0 0);
-
-  --ring: oklch(0.708 0 0);
-
-  --chart-1: oklch(0.87 0 0);
-
-  --chart-2: oklch(0.556 0 0);
-
-  --chart-3: oklch(0.439 0 0);
-
-  --chart-4: oklch(0.371 0 0);
-
-  --chart-5: oklch(0.269 0 0);
-
-  --radius: 0.625rem;
-
-  --sidebar: oklch(0.985 0 0);
-
-  --sidebar-foreground: oklch(0.145 0 0);
-
-  --sidebar-primary: oklch(0.205 0 0);
-
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-
-  --sidebar-accent: oklch(0.97 0 0);
-
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-
-  --sidebar-border: oklch(0.922 0 0);
-
-  --sidebar-ring: oklch(0.708 0 0)
+  --background: var(--void);
+  --foreground: var(--cloud);
+  --card: var(--slate-surface);
+  --card-foreground: var(--cloud);
+  --popover: var(--slate-surface);
+  --popover-foreground: var(--cloud);
+  --primary: var(--teal);
+  --primary-foreground: #0a0a0f;
+  --secondary: var(--ash);
+  --secondary-foreground: var(--cloud);
+  --muted: var(--ash);
+  --muted-foreground: var(--fog);
+  --accent: var(--teal-dim);
+  --accent-foreground: var(--teal);
+  --destructive: var(--danger);
+  --border: var(--ash);
+  --input: var(--ash);
+  --ring: var(--teal-border);
+  --chart-1: var(--teal);
+  --chart-2: var(--fog);
+  --chart-3: #8b5cf6;
+  --chart-4: var(--amber);
+  --chart-5: var(--danger);
+  --radius: 0.5rem;
+  --sidebar: var(--graphite);
+  --sidebar-foreground: var(--cloud);
+  --sidebar-primary: var(--teal);
+  --sidebar-primary-foreground: #0a0a0f;
+  --sidebar-accent: var(--teal-dim);
+  --sidebar-accent-foreground: var(--teal);
+  --sidebar-border: var(--ash);
+  --sidebar-ring: var(--teal-border);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
+/* ── Light Mode — ChatGPT-inspired clean whites ── */
+:root[data-theme="light"] {
+  --void: #ffffff;
+  --graphite: #f9f9f9;
+  --slate-surface: #ffffff;
+  --ash: #e5e5e5;
+  --fog: #6e6e80;
+  --cloud: #0d0d0d;
+  --teal: #0d9373;
+  --teal-dim: rgba(13, 147, 115, 0.08);
+  --teal-border: rgba(13, 147, 115, 0.25);
+  --danger: #ef4444;
+  --danger-dim: rgba(239, 68, 68, 0.08);
+  --amber: #f59e0b;
+  --emerald: #10b981;
 
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
+  color-scheme: light;
+  color: var(--cloud);
+  background: var(--void);
 
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-}
-
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
-}
-
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+  --background: var(--void);
+  --foreground: var(--cloud);
+  --card: #ffffff;
+  --card-foreground: var(--cloud);
+  --popover: #ffffff;
+  --popover-foreground: var(--cloud);
+  --primary: var(--teal);
+  --primary-foreground: #ffffff;
+  --secondary: #f4f4f5;
+  --secondary-foreground: var(--cloud);
+  --muted: #f4f4f5;
+  --muted-foreground: var(--fog);
+  --accent: var(--teal-dim);
+  --accent-foreground: var(--teal);
+  --destructive: var(--danger);
+  --border: var(--ash);
+  --input: var(--ash);
+  --ring: var(--teal-border);
+  --sidebar: var(--graphite);
+  --sidebar-foreground: var(--cloud);
+  --sidebar-primary: var(--teal);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--teal-dim);
+  --sidebar-accent-foreground: var(--teal);
+  --sidebar-border: var(--ash);
+  --sidebar-ring: var(--teal-border);
 }
 
 @theme inline {
   --font-heading: var(--font-sans);
   --font-sans: 'Geist Variable', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, Consolas, monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -218,46 +166,51 @@ code {
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
-}
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --color-void: var(--void);
+  --color-graphite: var(--graphite);
+  --color-slate-surface: var(--slate-surface);
+  --color-ash: var(--ash);
+  --color-fog: var(--fog);
+  --color-cloud: var(--cloud);
+  --color-teal: var(--teal);
+  --color-teal-dim: var(--teal-dim);
+  --color-teal-border: var(--teal-border);
+  --color-danger: var(--danger);
+  --color-danger-dim: var(--danger-dim);
+  --color-amber: var(--amber);
+  --color-emerald: var(--emerald);
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;}
+    @apply border-border outline-ring/50;
+  }
   body {
-    @apply bg-background text-foreground;}
+    @apply bg-background text-foreground;
+    margin: 0;
+  }
   html {
-    @apply font-sans;}}
+    @apply font-sans;
+  }
+}
+
+@layer utilities {
+  .scrollbar-clinical {
+    scrollbar-width: thin;
+    scrollbar-color: var(--ash) transparent;
+  }
+  .scrollbar-clinical::-webkit-scrollbar {
+    width: 6px;
+  }
+  .scrollbar-clinical::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-clinical::-webkit-scrollbar-thumb {
+    background: var(--ash);
+    border-radius: 3px;
+  }
+  .scrollbar-clinical::-webkit-scrollbar-thumb:hover {
+    background: var(--fog);
+  }
+}

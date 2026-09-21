@@ -11,8 +11,10 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from app.database.models import ChatMessage, ChatThread, Profile
+from app.assistant.schemas import MessageCitationCreate
+from app.database.models import ChatMessage, ChatThread, MessageCitation, Profile
 
 
 def _normalize_uuid(val: uuid.UUID | str) -> uuid.UUID:
@@ -117,7 +119,10 @@ async def list_messages(
     thread_id: uuid.UUID | str,
     user_id: uuid.UUID | str,
 ) -> list[ChatMessage]:
-    """Fetch chronological message history for a thread, enforcing tenancy."""
+    """Fetch chronological message history for a thread, enforcing tenancy.
+
+    Eagerly loads message citations ordered by citation_index for one-click audit.
+    """
     # Enforces ownership check; raises ValueError or PermissionError if invalid
     await get_thread(session, thread_id, user_id)
     tid = _normalize_uuid(thread_id)
@@ -125,6 +130,7 @@ async def list_messages(
     stmt = (
         select(ChatMessage)
         .where(ChatMessage.thread_id == tid)
+        .options(selectinload(ChatMessage.citations))
         .order_by(ChatMessage.created_at.asc())
     )
     result = await session.execute(stmt)
@@ -136,8 +142,9 @@ async def persist_turn(
     thread_id: uuid.UUID | str,
     user_content: str,
     assistant_content: str,
+    citations: list[MessageCitationCreate] | None = None,
 ) -> tuple[ChatMessage, ChatMessage]:
-    """Persist both user query and assistant response in a single transaction."""
+    """Persist user query, assistant response, and verified citations in a single transaction."""
     tid = _normalize_uuid(thread_id)
     user_msg = ChatMessage(
         thread_id=tid,
@@ -151,6 +158,23 @@ async def persist_turn(
     )
     session.add_all([user_msg, assistant_msg])
     await session.flush()
+
+    if citations:
+        citation_records = [
+            MessageCitation(
+                message_id=assistant_msg.id,
+                chunk_id=c.chunk_id,
+                nct_id=c.nct_id,
+                section_header=c.section_header,
+                verbatim_quote=c.verbatim_quote,
+                citation_index=c.citation_index,
+            )
+            for c in citations
+        ]
+        session.add_all(citation_records)
+        await session.flush()
+
     await session.refresh(user_msg)
-    await session.refresh(assistant_msg)
+    await session.refresh(assistant_msg, attribute_names=["citations"])
     return user_msg, assistant_msg
+

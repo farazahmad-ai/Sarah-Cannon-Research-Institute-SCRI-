@@ -48,6 +48,31 @@ class ThreadOut(BaseModel):
     created_at: datetime
 
 
+class CitationOut(BaseModel):
+    """Response model for grounded message citations."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    message_id: uuid.UUID
+    chunk_id: uuid.UUID | None = None
+    nct_id: str
+    section_header: str
+    verbatim_quote: str
+    citation_index: int
+    created_at: datetime | None = None
+
+
+class MessageCitationCreate(BaseModel):
+    """Input payload for attaching a verified citation to a message."""
+
+    chunk_id: uuid.UUID | None = None
+    nct_id: str
+    section_header: str
+    verbatim_quote: str
+    citation_index: int
+
+
 class MessageOut(BaseModel):
     """Response model for individual chat messages."""
 
@@ -58,6 +83,7 @@ class MessageOut(BaseModel):
     role: str
     content: str
     created_at: datetime
+    citations: list[CitationOut] = Field(default_factory=list)
 
 
 class ProtocolPassage(BaseModel):
@@ -86,3 +112,44 @@ class ProtocolPassage(BaseModel):
         default=None,
         description="Brief clinical trial title for display",
     )
+
+
+class TrialSummary(BaseModel):
+    """Summary representation for a landmark clinical trial."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    nct_id: str
+    brief_title: str
+    category: str
+    phases: list[str] | None = None
+    status: str
+    organization: str | None = None
+    start_date: date | None = None
+    primary_completion_date: date | None = None
+
+
+class TrialChunkOut(BaseModel):
+    """Structured protocol chunk representation."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    nct_id: str
+    section_type: str
+    section_title: str
+    chunk_index: int
+    chunk_text: str
+    token_count: int
+
+
+class TrialDetail(TrialSummary):
+    """Full protocol detail for a clinical trial including all chunks."""
+
+    official_title: str | None = None
+    last_update_posted_date: date | None = None
+    conditions: list[str] | None = None
+    arms: list[dict[str, object]] | None = None
+    primary_outcomes: list[dict[str, object]] | None = None
+    chunks: list[TrialChunkOut] = Field(default_factory=list)
+

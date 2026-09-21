@@ -8,10 +8,12 @@ its own sub-router that gets included here.
 from fastapi import APIRouter, Depends
 
 from app.api.chat import chat_router
+from app.api.trials import trials_router
 from app.auth.jwt import AuthenticatedUser, get_current_user
 
 api_router = APIRouter(prefix="/api")
 api_router.include_router(chat_router)
+api_router.include_router(trials_router)
 
 
 @api_router.get(
