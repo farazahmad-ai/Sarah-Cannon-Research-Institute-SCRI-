@@ -93,3 +93,24 @@ def test_all_below_floor_returns_empty_list():
     filtered = apply_similarity_floor(passages, floor=0.30, vector_search_healthy=True)
 
     assert filtered == []
+
+
+def test_floor_preserves_top_lexical_when_requested():
+    """Top lexical match survives the floor when preserve_top_lexical is specified (M1)."""
+    p_semantic = _make_passage(similarity=0.65)
+    p_lexical_top = _make_passage(similarity=None, text="KRAS G12D positive")
+    p_lexical_second = _make_passage(similarity=None, text="EGFR Exon 20 insertion")
+
+    passages = [p_semantic, p_lexical_top, p_lexical_second]
+    filtered = apply_similarity_floor(
+        passages,
+        floor=0.30,
+        vector_search_healthy=True,
+        preserve_top_lexical=1,
+    )
+
+    assert len(filtered) == 2
+    assert p_semantic in filtered
+    assert p_lexical_top in filtered
+    assert p_lexical_second not in filtered
+

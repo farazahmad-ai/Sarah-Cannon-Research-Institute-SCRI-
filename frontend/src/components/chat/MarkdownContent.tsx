@@ -27,7 +27,7 @@ function renderInline(text: string, citationMap: Map<string, CitationData>): Rea
   // 2. Bold: **text**
   // 3. Inline code: `text`
   // 4. Italic: *text* or _text_
-  const tokenRegex = /(\[(?:NCT\d{8}[^\]]*)\]|\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*|_[^_]+_)/g;
+  const tokenRegex = /(\[(?:NCT\d{8}[^\]]*)\]|\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*|_[^_]+_)/gi;
 
   const parts = text.split(tokenRegex);
   const elements: React.ReactNode[] = [];
@@ -37,7 +37,7 @@ function renderInline(text: string, citationMap: Map<string, CitationData>): Rea
     if (!part) continue;
 
     // 1. Citation check: [NCT12345678, ...]
-    if (part.startsWith("[NCT") && part.endsWith("]")) {
+    if (/^\[NCT\d{8}/i.test(part) && part.endsWith("]")) {
       const citation = citationMap.get(part);
       elements.push(
         <CitationPill key={`cit-${i}-${part}`} label={part} citation={citation} />

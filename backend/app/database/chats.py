@@ -9,7 +9,6 @@ Enforces:
 import uuid
 
 from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -33,14 +32,24 @@ async def upsert_profile(
     
     Prevents foreign key violations when creating chat threads for newly
     signed-in users whose profiles have not yet been explicitly seeded.
+    Handles existing records safely to avoid unique constraint collisions.
     """
     uid = _normalize_uuid(user_id)
-    stmt = (
-        insert(Profile)
-        .values(id=uid, email=email, role="coordinator")
-        .on_conflict_do_nothing(index_elements=["id"])
-    )
-    await session.execute(stmt)
+    existing = await session.get(Profile, uid)
+    if existing:
+        if existing.email != email:
+            existing.email = email
+            await session.flush()
+        return
+
+    # Check if a profile with this email already exists under another id
+    res = await session.execute(select(Profile).where(Profile.email == email))
+    by_email = res.scalar_one_or_none()
+    if by_email:
+        return
+
+    profile = Profile(id=uid, email=email, role="coordinator")
+    session.add(profile)
     await session.flush()
 
 
@@ -168,6 +177,7 @@ async def persist_turn(
                 section_header=c.section_header,
                 verbatim_quote=c.verbatim_quote,
                 citation_index=c.citation_index,
+                last_update_posted_date=c.last_update_posted_date,
             )
             for c in citations
         ]

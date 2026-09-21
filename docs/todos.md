@@ -403,11 +403,16 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
 
 ## Phase 7: Benchmark Evaluation & Deployment
 
-- [ ] **7.1 Clinical Benchmark Verification:**
-  - [ ] File: `backend/tests/test_clinical_benchmarks.py`:
-    - Run the 10 real-world coordinator screening benchmark questions from the project brief
-    - Verify 100% citation grounding (0 hallucinated criteria)
-    - Verify negative refusal behavior on protocol silence queries
+- [x] **7.1 Clinical Benchmark Verification:**
+  *Pilot gate verified: 10/10 coordinator screening questions grounded against live Supabase pgvector/FTS + GPT-4o; 100% citation grounding (0 hallucinated criteria); negative refusal verified on protocol silence (Q10 on NCT02277548) and adversarial off-corpus set.*
+  - [x] File: `backend/tests/test_clinical_benchmarks.py`:
+    - [x] Run the 10 real-world coordinator screening benchmark questions from the project brief
+    - [x] Verify 100% citation grounding (0 hallucinated criteria)
+    - [x] Verify negative refusal behavior on protocol silence queries
+    - [x] Verify 5 adversarial off-corpus refusal queries (pediatric GBM finding C3 guard, pancreatic, Alzheimer's, France, prompt injection)
+    - [x] Verify database test thread cleanup (0 residue left behind)
+  - [x] File: `backend/tests/test_pilot_readiness.py`:
+    - [x] Stress & adversarial suite (53 offline + live integration tests) covering prompt injection inside protocol text, malformed citations, sanitizer idempotence, multi-turn grounding, client disconnect persistence (D-3), and cross-tenant isolation
 - [ ] **7.2 Deployment Configuration:**
   - [ ] File: `backend/Dockerfile`: FastAPI Uvicorn container
   - [ ] File: `frontend/Dockerfile` & `frontend/nginx.conf`: Vite static build served via Nginx

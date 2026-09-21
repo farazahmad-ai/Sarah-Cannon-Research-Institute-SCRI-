@@ -18,15 +18,7 @@ function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route
-              path="/chat"
-              element={
-                <ProtectedRoute>
-                  <ChatPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/chat/:threadId"
+              path="/chat/:threadId?"
               element={
                 <ProtectedRoute>
                   <ChatPage />

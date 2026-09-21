@@ -11,6 +11,7 @@ import {
   MessageSquare,
   Plus,
   Trash2,
+  X,
   LogOut,
   FlaskConical,
   Beaker,
@@ -24,8 +25,9 @@ import { useTheme } from "@/context/ThemeContext";
 interface ThreadSidebarProps {
   activeThreadId?: string;
   onSelectThread: (threadId: string) => void;
-  onCreateThread: () => Promise<void>;
+  onCreateThread: () => Promise<void> | void;
   isCreating?: boolean;
+  refreshKey?: number;
 }
 
 export function ThreadSidebar({
@@ -33,6 +35,7 @@ export function ThreadSidebar({
   onSelectThread,
   onCreateThread,
   isCreating = false,
+  refreshKey = 0,
 }: ThreadSidebarProps) {
   const { user, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -41,6 +44,7 @@ export function ThreadSidebar({
   const [threads, setThreads] = useState<ThreadOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const isTrialsPage = location.pathname === "/trials";
 
@@ -58,21 +62,32 @@ export function ThreadSidebar({
 
   useEffect(() => {
     fetchThreads();
-  }, [activeThreadId]);
+  }, [activeThreadId, refreshKey]);
 
-  const handleDelete = async (e: React.MouseEvent, threadId: string) => {
+  const handleDeleteClick = (e: React.MouseEvent, threadId: string) => {
     e.stopPropagation();
-    if (!confirm("Delete this screening session?")) return;
+    setConfirmDeleteId(threadId);
+  };
 
+  const handleCancelDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setConfirmDeleteId(null);
+  };
+
+  const handleConfirmDelete = async (e: React.MouseEvent, threadId: string) => {
+    e.stopPropagation();
     try {
       setDeletingId(threadId);
       await api.chat.deleteThread(threadId);
       setThreads((prev) => prev.filter((t) => t.id !== threadId));
-      if (activeThreadId === threadId) onSelectThread("");
+      if (activeThreadId === threadId) {
+        onSelectThread("");
+      }
     } catch (err) {
       console.error("Failed to delete thread:", err);
     } finally {
       setDeletingId(null);
+      setConfirmDeleteId(null);
     }
   };
 
@@ -161,15 +176,48 @@ export function ThreadSidebar({
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={(e) => handleDelete(e, thread.id)}
-                    disabled={deletingId === thread.id}
-                    className="opacity-0 group-hover:opacity-100 p-1 rounded text-fog/50 hover:text-danger transition-all shrink-0"
-                    title="Delete session"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
+                  {confirmDeleteId === thread.id ? (
+                    <div
+                      className="flex items-center gap-1 shrink-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        onClick={(e) => handleConfirmDelete(e, thread.id)}
+                        disabled={deletingId === thread.id}
+                        className="px-1.5 py-0.5 rounded bg-danger hover:bg-danger/85 text-void font-semibold text-[10px] transition-colors cursor-pointer"
+                        title="Confirm deletion"
+                      >
+                        {deletingId === thread.id ? "..." : "Delete"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelDelete}
+                        className="p-1 rounded text-fog hover:text-cloud transition-colors cursor-pointer"
+                        title="Cancel"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(e) => handleDeleteClick(e, thread.id)}
+                      disabled={deletingId === thread.id}
+                      className={`p-1.5 rounded transition-all shrink-0 cursor-pointer ${
+                        isActive
+                          ? "opacity-60 hover:opacity-100 text-fog hover:text-danger hover:bg-ash/40"
+                          : "opacity-0 group-hover:opacity-100 text-fog/50 hover:text-danger hover:bg-ash/40"
+                      }`}
+                      title="Delete session"
+                    >
+                      {deletingId === thread.id ? (
+                        <div className="w-3 h-3 border-2 border-ash border-t-danger rounded-full animate-spin" />
+                      ) : (
+                        <Trash2 className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -181,15 +229,23 @@ export function ThreadSidebar({
       <div className="px-1.5 pb-1">
         <button
           type="button"
-          onClick={() => navigate("/trials")}
-          className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-[12px] transition-colors cursor-pointer ${
+          onClick={() => (isTrialsPage ? navigate("/chat") : navigate("/trials"))}
+          className={`w-full flex items-center justify-between px-2.5 py-2 rounded-md text-[12px] transition-colors cursor-pointer ${
             isTrialsPage
-              ? "bg-teal-dim/50 text-teal"
+              ? "bg-teal-dim/50 text-teal font-medium"
               : "text-fog hover:text-cloud hover:bg-ash/30"
           }`}
+          title={isTrialsPage ? "Return to screening chat" : "Open trial catalog"}
         >
-          <FlaskConical className="w-3.5 h-3.5" />
-          <span>Trial catalog</span>
+          <div className="flex items-center gap-2">
+            <FlaskConical className="w-3.5 h-3.5" />
+            <span>Trial catalog</span>
+          </div>
+          {isTrialsPage && (
+            <span className="text-[10px] text-teal/70 px-1 py-0.5 rounded bg-teal/10">
+              Open
+            </span>
+          )}
         </button>
       </div>
 

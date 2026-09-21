@@ -9,7 +9,7 @@ Provides read-only queries for:
 import logging
 from collections.abc import Sequence
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -69,3 +69,21 @@ async def get_trial_with_chunks(
         # Guarantee chunks are strictly sorted by chunk_index
         trial.chunks.sort(key=lambda c: c.chunk_index)
     return trial
+
+
+async def get_corpus_manifest(session: AsyncSession) -> dict[str, int]:
+    """Return trial counts per disease category (audit C3 / N3).
+
+    Why this exists: the model previously had no knowledge of what the corpus
+    contains, so a question like "does this system have pediatric GBM protocols?"
+    was unanswerable — and the model answered from general knowledge instead.
+    This manifest makes corpus-coverage questions truthfully answerable and
+    grounds the deterministic no-evidence refusal.
+    """
+    stmt = (
+        select(ClinicalTrial.category, func.count())
+        .group_by(ClinicalTrial.category)
+        .order_by(ClinicalTrial.category.asc())
+    )
+    result = await session.execute(stmt)
+    return {category: count for category, count in result.all()}

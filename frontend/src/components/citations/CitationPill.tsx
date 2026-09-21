@@ -13,6 +13,7 @@ export interface CitationData {
   section_header: string;
   verbatim_quote: string;
   citation_index: number;
+  last_update_posted_date?: string | null;
   created_at?: string | null;
 }
 
@@ -28,9 +29,9 @@ export function CitationPill({ label, citation }: CitationPillProps) {
   const pillRef = useRef<HTMLButtonElement>(null);
 
   if (!citation) {
-    // No structured data — render as a static styled span
+    // Unverified or unlinked reference — render with distinct muted dashed styling
     return (
-      <span className="inline-flex items-center font-mono text-[11px] text-teal bg-teal-dim border border-teal-border px-1.5 py-0.5 rounded mx-0.5 select-all">
+      <span className="inline-flex items-center font-mono text-[11px] text-muted-foreground bg-ash/20 border border-dashed border-ash/60 px-1.5 py-0.5 rounded mx-0.5 select-all" title="Unverified citation reference">
         {label}
       </span>
     );

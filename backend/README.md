@@ -33,7 +33,7 @@ uv sync
 
 ### Development Server (with hot reload)
 ```bash
-uv run uvicorn app.main:app --reload --port 8000
+uv run python -m uvicorn app.main:app --reload --port 8000
 ```
 *or directly via Python:*
 ```bash

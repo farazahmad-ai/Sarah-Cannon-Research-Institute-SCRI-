@@ -47,8 +47,8 @@ export function CitationPopover({
     };
   }, [onClose, anchorRef]);
 
-  const amendmentDate = citation.created_at
-    ? new Date(citation.created_at).toLocaleDateString(undefined, {
+  const amendmentDate = citation.last_update_posted_date
+    ? new Date(citation.last_update_posted_date).toLocaleDateString(undefined, {
         year: "numeric",
         month: "short",
         day: "numeric",

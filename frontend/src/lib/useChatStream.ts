@@ -83,10 +83,13 @@ export function useChatStream({
       abortControllerRef.current = abortController;
 
       try {
-        const response = await api.chat.stream({
-          thread_id: currentThreadId,
-          message: trimmed,
-        });
+        const response = await api.chat.stream(
+          {
+            thread_id: currentThreadId,
+            message: trimmed,
+          },
+          abortController.signal
+        );
 
         if (!response.body) {
           throw new Error("No response stream body received.");
@@ -118,6 +121,15 @@ export function useChatStream({
                 hasNewToken = true;
               } catch (e) {
                 console.error("Error parsing stream token:", trimmedLine, e);
+              }
+            } else if (trimmedLine.startsWith("u:")) {
+              // Full-text update / replacement frame (e.g. C1 sanitized grounding replacement)
+              try {
+                const fullText = JSON.parse(trimmedLine.slice(2));
+                accumulatedAssistantText = fullText;
+                hasNewToken = true;
+              } catch (e) {
+                console.error("Error parsing update frame:", trimmedLine, e);
               }
             } else if (trimmedLine.startsWith("3:")) {
               // Vercel AI SDK error frame

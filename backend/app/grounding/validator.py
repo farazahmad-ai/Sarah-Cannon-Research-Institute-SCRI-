@@ -122,6 +122,7 @@ class GroundingValidator:
                     section_header=matched_passage.section_header,
                     verbatim_quote=matched_passage.chunk_text[:1000].strip(),
                     citation_index=citation_counter,
+                    last_update_posted_date=matched_passage.last_update_posted_date,
                 )
             )
             citation_counter += 1

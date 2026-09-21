@@ -60,6 +60,7 @@ class CitationOut(BaseModel):
     section_header: str
     verbatim_quote: str
     citation_index: int
+    last_update_posted_date: date | None = None
     created_at: datetime | None = None
 
 
@@ -71,6 +72,7 @@ class MessageCitationCreate(BaseModel):
     section_header: str
     verbatim_quote: str
     citation_index: int
+    last_update_posted_date: date | None = None
 
 
 class MessageOut(BaseModel):

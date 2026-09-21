@@ -142,6 +142,7 @@ export interface CitationOut {
   section_header: string;
   verbatim_quote: string;
   citation_index: number;
+  last_update_posted_date?: string | null;
   created_at: string | null;
 }
 
@@ -163,15 +164,22 @@ export const api = {
   },
 
   trials: {
-    /** List all 25 landmark trials with summary metadata. */
-    list: async (): Promise<TrialSummary[]> => {
-      const res = await apiFetch("/api/trials");
+    /** List trials matching optional category / search filters. */
+    list: async (params?: {
+      category?: string;
+      search?: string;
+    }): Promise<TrialSummary[]> => {
+      const query = new URLSearchParams();
+      if (params?.category) query.set("category", params.category);
+      if (params?.search) query.set("search", params.search);
+      const qs = query.toString();
+      const res = await apiFetch(`/api/trials${qs ? `?${qs}` : ""}`);
       return res.json();
     },
 
-    /** Fetch full protocol detail for a single trial by NCT ID. */
+    /** Retrieve full trial metadata and ordered protocol chunks. */
     get: async (nctId: string): Promise<TrialDetail> => {
-      const res = await apiFetch(`/api/trials/${nctId}`);
+      const res = await apiFetch(`/api/trials/${encodeURIComponent(nctId)}`);
       return res.json();
     },
   },
@@ -180,16 +188,19 @@ export const api = {
     /**
      * Open a streaming SSE connection to the chat endpoint.
      *
-     * Returns the raw Response so the caller (useChat / Vercel AI SDK) can
-     * consume the ReadableStream directly — we do not parse it here.
+     * Returns the raw Response so the caller can consume the ReadableStream directly.
      */
-    stream: async (body: {
-      thread_id: string | null;
-      message: string;
-    }): Promise<Response> => {
+    stream: async (
+      body: {
+        thread_id: string | null;
+        message: string;
+      },
+      signal?: AbortSignal
+    ): Promise<Response> => {
       return apiFetch("/api/chat/stream", {
         method: "POST",
         body: JSON.stringify(body),
+        signal,
       });
     },
 

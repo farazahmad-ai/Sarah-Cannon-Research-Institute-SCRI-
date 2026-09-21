@@ -14,7 +14,7 @@ import { ChatContainer } from "@/components/chat/ChatContainer";
 export function ChatPage() {
   const { threadId } = useParams<{ threadId?: string }>();
   const navigate = useNavigate();
-  const [isCreating, setIsCreating] = useState(false);
+  const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0);
 
   const handleSelectThread = (id: string) => {
     if (!id) {
@@ -26,14 +26,16 @@ export function ChatPage() {
 
   const handleCreateThread = async () => {
     try {
-      setIsCreating(true);
-      const newThread = await api.chat.createThread();
+      const newThread = await api.chat.createThread("New session");
       navigate(`/chat/${newThread.id}`);
+      handleThreadActivity();
     } catch (err) {
       console.error("Failed to create thread:", err);
-    } finally {
-      setIsCreating(false);
     }
+  };
+
+  const handleThreadActivity = () => {
+    setSidebarRefreshKey((k) => k + 1);
   };
 
   return (
@@ -42,12 +44,16 @@ export function ChatPage() {
         activeThreadId={threadId}
         onSelectThread={handleSelectThread}
         onCreateThread={handleCreateThread}
-        isCreating={isCreating}
+        refreshKey={sidebarRefreshKey}
       />
       <main className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
         <ChatContainer
           threadId={threadId}
-          onThreadCreated={(id) => navigate(`/chat/${id}`)}
+          onThreadCreated={(id) => {
+            navigate(`/chat/${id}`);
+            handleThreadActivity();
+          }}
+          onStreamComplete={handleThreadActivity}
         />
       </main>
     </div>

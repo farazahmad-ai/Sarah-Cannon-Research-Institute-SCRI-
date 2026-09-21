@@ -7,12 +7,18 @@
  */
 
 import { useEffect, useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { Search, FlaskConical, X } from "lucide-react";
 import { api, type TrialSummary } from "@/lib/api";
 import { TrialCard, formatCategory } from "./TrialCard";
 import { TrialDetailDrawer } from "./TrialDetailDrawer";
 
-export function TrialList() {
+interface TrialListProps {
+  onClose?: () => void;
+}
+
+export function TrialList({ onClose }: TrialListProps = {}) {
+  const navigate = useNavigate();
   const [trials, setTrials] = useState<TrialSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -81,18 +87,30 @@ export function TrialList() {
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-void">
       {/* Header & Filter bar */}
       <div className="px-6 pt-6 pb-4 border-b border-ash shrink-0">
-        <div className="flex items-center gap-2.5 mb-4">
-          <div className="w-8 h-8 rounded-lg bg-teal-dim border border-teal-border flex items-center justify-center text-teal">
-            <FlaskConical className="w-4 h-4" />
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-teal-dim border border-teal-border flex items-center justify-center text-teal">
+              <FlaskConical className="w-4 h-4" />
+            </div>
+            <div>
+              <h1 className="text-[18px] font-semibold text-cloud tracking-tight leading-none">
+                Trial Catalog
+              </h1>
+              <p className="text-[11px] text-fog mt-1">
+                Active SCRI landmark oncology protocols ({trials.length} trials loaded)
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-[18px] font-semibold text-cloud tracking-tight leading-none">
-              Trial Catalog
-            </h1>
-            <p className="text-[11px] text-fog mt-1">
-              Active SCRI landmark oncology protocols ({trials.length} trials loaded)
-            </p>
-          </div>
+
+          <button
+            type="button"
+            onClick={onClose || (() => navigate("/chat"))}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-ash bg-slate-surface hover:bg-ash/50 text-fog hover:text-cloud text-[12px] font-medium transition-colors cursor-pointer"
+            title="Close catalog and return to screening chat"
+          >
+            <X className="w-4 h-4" />
+            <span>Close</span>
+          </button>
         </div>
 
         {/* Category filter pills */}

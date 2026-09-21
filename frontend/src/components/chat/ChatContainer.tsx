@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Sparkles, AlertCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { api } from "@/lib/api";
 import { useChatStream } from "@/lib/useChatStream";
 import { ChatMessage } from "./ChatMessage";
@@ -18,6 +18,7 @@ import type { CitationOut } from "@/lib/api";
 interface ChatContainerProps {
   threadId?: string;
   onThreadCreated?: (threadId: string) => void;
+  onStreamComplete?: (threadId: string) => void;
 }
 
 const QUICK_PROMPTS = [
@@ -35,7 +36,11 @@ const QUICK_PROMPTS = [
   },
 ];
 
-export function ChatContainer({ threadId, onThreadCreated }: ChatContainerProps) {
+export function ChatContainer({
+  threadId,
+  onThreadCreated,
+  onStreamComplete,
+}: ChatContainerProps) {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   /** Citation data keyed by message ID for interactive pills. */
@@ -47,21 +52,48 @@ export function ChatContainer({ threadId, onThreadCreated }: ChatContainerProps)
   // Track thread ID created by the current streaming interaction to prevent wiping messages
   const justCreatedThreadIdRef = useRef<string | null>(null);
 
+  // Map citations by assistant turn index as a resilient fallback for client/server ID mismatch (H2)
+  const [citationsByIndex, setCitationsByIndex] = useState<Map<number, CitationOut[]>>(new Map());
+  const setMessagesRef = useRef<((messages: any[]) => void) | null>(null);
+
   const handleStreamComplete = useCallback(async (completedThreadId: string) => {
     try {
-      // Reload history to retrieve verified citations saved by backend
+      // Reload history to retrieve verified citations and DB message IDs saved by backend
       const history = await api.chat.messages(completedThreadId);
       const cMap = new Map<string, CitationOut[]>();
+      const cIndexMap = new Map<number, CitationOut[]>();
+      let aIdx = 0;
+
       for (const m of history) {
         if (m.citations && m.citations.length > 0) {
           cMap.set(m.id, m.citations);
         }
+        if (m.role === "assistant") {
+          if (m.citations && m.citations.length > 0) {
+            cIndexMap.set(aIdx, m.citations);
+          }
+          aIdx++;
+        }
       }
       setCitationsByMessage(cMap);
+      setCitationsByIndex(cIndexMap);
+
+      // Reconcile client-generated temporary IDs with authoritative DB messages
+      if (setMessagesRef.current) {
+        setMessagesRef.current(
+          history.map((m) => ({
+            id: m.id,
+            role: m.role as "user" | "assistant",
+            content: m.content,
+            createdAt: new Date(m.created_at),
+          }))
+        );
+      }
+      onStreamComplete?.(completedThreadId);
     } catch (e) {
       console.error("Failed to load citations on stream complete:", e);
     }
-  }, []);
+  }, [onStreamComplete]);
 
   const handleThreadCreated = useCallback(
     (newId: string) => {
@@ -89,11 +121,14 @@ export function ChatContainer({ threadId, onThreadCreated }: ChatContainerProps)
     },
   });
 
+  setMessagesRef.current = setMessages;
+
   // Load message history + citations when threadId changes
   useEffect(() => {
     if (!threadId) {
       setMessages([]);
       setCitationsByMessage(new Map());
+      setCitationsByIndex(new Map());
       justCreatedThreadIdRef.current = null;
       return;
     }
@@ -116,12 +151,22 @@ export function ChatContainer({ threadId, onThreadCreated }: ChatContainerProps)
         if (isMounted) {
           // Build citation lookup
           const cMap = new Map<string, CitationOut[]>();
+          const cIndexMap = new Map<number, CitationOut[]>();
+          let aIdx = 0;
+
           for (const m of history) {
             if (m.citations && m.citations.length > 0) {
               cMap.set(m.id, m.citations);
             }
+            if (m.role === "assistant") {
+              if (m.citations && m.citations.length > 0) {
+                cIndexMap.set(aIdx, m.citations);
+              }
+              aIdx++;
+            }
           }
           setCitationsByMessage(cMap);
+          setCitationsByIndex(cIndexMap);
 
           setMessages(
             history.map((m) => ({
@@ -170,16 +215,19 @@ export function ChatContainer({ threadId, onThreadCreated }: ChatContainerProps)
         ) : messages.length === 0 ? (
           /* ── Empty State ── */
           <div className="h-full flex flex-col items-center justify-center max-w-xl mx-auto text-center px-6">
-            <div className="w-10 h-10 rounded-xl bg-teal-dim border border-teal-border flex items-center justify-center text-teal mb-5">
-              <Sparkles className="w-5 h-5" />
-            </div>
-
             <h2 className="text-[18px] font-semibold text-cloud tracking-tight">
               Clinical protocol assistant
             </h2>
             <p className="text-[13px] text-fog mt-2 max-w-sm leading-relaxed">
               Ask plain-English questions about clinical trial eligibility criteria, washout periods, and biomarker thresholds.
             </p>
+
+            {errorMsg && (
+              <div className="flex items-center gap-2 p-3 mt-4 bg-danger-dim border border-danger/30 rounded-lg text-danger text-[12px] max-w-md text-left">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{errorMsg}</span>
+              </div>
+            )}
 
             {/* Suggested prompts */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 w-full mt-7">
@@ -202,24 +250,32 @@ export function ChatContainer({ threadId, onThreadCreated }: ChatContainerProps)
         ) : (
           /* ── Message Thread ── */
           <div className="max-w-3xl mx-auto w-full px-4 md:px-6 py-4">
-            {messages.map((m, idx) => {
-              const isLastAssistant =
-                idx === messages.length - 1 && m.role === "assistant";
-              return (
-                <div key={m.id || idx}>
-                  {idx > 0 && (
-                    <div className="border-t border-ash/40 my-1" />
-                  )}
-                  <ChatMessage
-                    role={m.role as "user" | "assistant"}
-                    content={m.content}
-                    createdAt={m.createdAt ? m.createdAt.toISOString() : undefined}
-                    isStreaming={isLastAssistant && isLoading}
-                    citations={citationsByMessage.get(m.id)}
-                  />
-                </div>
-              );
-            })}
+            {(() => {
+              let assistantTurn = 0;
+              return messages.map((m, idx) => {
+                const isLastAssistant =
+                  idx === messages.length - 1 && m.role === "assistant";
+                const currentAssistantIdx = m.role === "assistant" ? assistantTurn++ : -1;
+                const messageCitations =
+                  citationsByMessage.get(m.id) ||
+                  (currentAssistantIdx >= 0 ? citationsByIndex.get(currentAssistantIdx) : undefined);
+
+                return (
+                  <div key={m.id || idx}>
+                    {idx > 0 && (
+                      <div className="border-t border-ash/40 my-1" />
+                    )}
+                    <ChatMessage
+                      role={m.role as "user" | "assistant"}
+                      content={m.content}
+                      createdAt={m.createdAt ? m.createdAt.toISOString() : undefined}
+                      isStreaming={isLastAssistant && isLoading}
+                      citations={messageCitations}
+                    />
+                  </div>
+                );
+              });
+            })()}
 
             {errorMsg && (
               <div className="flex items-center gap-2 p-3 my-3 bg-danger-dim border border-danger/30 rounded-lg text-danger text-[12px]">
