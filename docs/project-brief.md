@@ -42,12 +42,13 @@ An internal, web-based AI intelligence assistant deployed for SCRI coordinators,
 
 ## Real Trial Corpus (Pilot Phase)
 
-The pilot corpus consists of **40 landmark interventional oncology trials** fetched directly from the **ClinicalTrials.gov REST API v2**, representing core SCRI focus areas:
+The pilot corpus consists of **25 landmark interventional oncology trials** (5 per disease category) fetched directly from the **ClinicalTrials.gov REST API v2**, representing core SCRI focus areas:
 
-1. **Thoracic Oncology (NSCLC / SCLC):** Targeting *EGFR*, *ALK*, *KRAS G12C*, *ROS1*, and *MET* exon 14 skipping.
-2. **Hematologic Malignancies (DLBCL, Follicular Lymphoma, Multiple Myeloma):** Novel CAR-T cell re-infusion protocols, CD19/CD20 bispecific antibodies, and cereblon E3 ligase modulators.
-3. **Gastrointestinal & Colorectal Cancers:** Microsatellite Instability (MSI-H / dMMR), *BRAF V600E*, and HER2-amplified metastatic colorectal trials.
-4. **Breast & Gynecologic Cancers:** Antibody-Drug Conjugates (ADCs) like Trastuzumab deruxtecan and Sacituzumab govitecan in HER2-low and triple-negative breast cancer.
+1. **Thoracic Oncology (NSCLC):** Targeting *EGFR*, *ALK*, *KRAS G12C*, *ROS1*, and *MET* exon 14 skipping.
+2. **Hematologic Malignancies (DLBCL & CAR-T / Bispecifics):** Novel CAR-T cell re-infusion protocols, CD19/CD20 bispecific antibodies, and cellular therapies.
+3. **Gastrointestinal & Colorectal Cancers (mCRC):** Microsatellite Instability (MSI-H / dMMR), *BRAF V600E*, and HER2-amplified metastatic colorectal trials.
+4. **Breast Cancers (TNBC & HER2-Low):** Antibody-Drug Conjugates (ADCs) like Trastuzumab deruxtecan and Sacituzumab govitecan in HER2-low and triple-negative breast cancer.
+5. **Advanced & Metastatic Melanoma:** Immune checkpoint inhibitors, BRAF/MEK targeted therapies, and novel combination immunotherapies.
 
 ## 10 Realistic Coordinator Queries
 
