@@ -53,7 +53,7 @@ export function ChatInput({
       onSubmit={handleSubmit}
       className="relative flex flex-col w-full max-w-3xl mx-auto px-4 pb-4 pt-2"
     >
-      <div className="relative flex items-end bg-slate-surface border border-ash rounded-xl p-1.5 focus-within:border-teal-border focus-within:ring-1 focus-within:ring-teal-border/30 transition-all">
+      <div className="relative flex items-end bg-slate-surface border border-gray-300 dark:border-ash rounded-2xl p-2 shadow-[0_2px_12px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)] focus-within:border-teal focus-within:ring-2 focus-within:ring-teal/20 transition-all">
         <textarea
           ref={textareaRef}
           value={input}
@@ -62,7 +62,7 @@ export function ChatInput({
           rows={1}
           placeholder={placeholder}
           disabled={isLoading}
-          className="w-full bg-transparent text-cloud placeholder:text-fog/50 text-[13px] resize-none px-3 py-2 focus:outline-none min-h-[40px] max-h-[160px] leading-relaxed"
+          className="w-full bg-transparent text-cloud placeholder:text-fog/80 text-[13px] resize-none px-3 py-1.5 focus:outline-none min-h-[42px] max-h-[160px] leading-relaxed font-sans"
         />
 
         <div className="flex items-center pb-1 pr-1 shrink-0">
@@ -70,7 +70,7 @@ export function ChatInput({
             <button
               type="button"
               onClick={stop}
-              className="flex items-center justify-center w-7 h-7 rounded-lg bg-danger-dim border border-danger/30 text-danger hover:bg-danger/20 transition-colors cursor-pointer"
+              className="flex items-center justify-center w-8 h-8 rounded-xl bg-danger-dim border border-danger/40 text-danger hover:bg-danger/25 transition-colors cursor-pointer"
               title="Stop generating"
             >
               <Square className="w-3 h-3 fill-current" />
@@ -79,17 +79,17 @@ export function ChatInput({
             <button
               type="submit"
               disabled={!input.trim() || isLoading}
-              className="flex items-center justify-center w-7 h-7 rounded-lg bg-teal hover:bg-teal/85 disabled:opacity-30 disabled:hover:bg-teal text-void transition-all disabled:cursor-not-allowed cursor-pointer"
+              className="flex items-center justify-center w-8 h-8 rounded-xl bg-teal hover:bg-teal/85 disabled:opacity-35 disabled:hover:bg-teal text-void transition-all disabled:cursor-not-allowed cursor-pointer shadow-xs"
               title="Send (Enter)"
             >
-              <ArrowUp className="w-3.5 h-3.5" />
+              <ArrowUp className="w-4 h-4 stroke-[2.5]" />
             </button>
           )}
         </div>
       </div>
 
-      <p className="text-[10px] text-fog/50 text-center mt-2">
-        Answers are grounded in ClinicalTrials.gov protocols. Not medical advice.
+      <p className="text-[11px] text-fog/70 text-center mt-2 font-normal">
+        Answers are strictly grounded in ClinicalTrials.gov protocols. Not medical advice.
       </p>
     </form>
   );

@@ -8,31 +8,53 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { AlertCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { AlertCircle, PanelLeft, Sun, Moon } from "lucide-react";
 import { api } from "@/lib/api";
 import { useChatStream } from "@/lib/useChatStream";
+import { useTheme } from "@/context/ThemeContext";
 import { ChatMessage } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
+import { CitationDrawer } from "@/components/citations/CitationDrawer";
+import type { CitationData } from "@/components/citations/CitationPill";
 import type { CitationOut } from "@/lib/api";
 
 interface ChatContainerProps {
   threadId?: string;
   onThreadCreated?: (threadId: string) => void;
   onStreamComplete?: (threadId: string) => void;
+  isSidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
 }
 
-const QUICK_PROMPTS = [
+const EXEMPLARY_QUERIES = [
   {
-    title: "Prior therapy washout",
-    prompt: "What is the prior therapy washout period for study treatment?",
+    category: "Thoracic (NSCLC)",
+    title: "Prior Immunotherapy Washouts",
+    description: "Checkpoint inhibitor washout intervals (28-day vs 14-day / 5 half-lives)",
+    prompt:
+      "Across our active lymphoma and lung cancer trials, which protocols require a 28-day washout for prior checkpoint inhibitor therapy versus a 14-day or 5 half-life washout?",
   },
   {
-    title: "Brain metastases",
-    prompt: "What are the exclusion criteria regarding treated or active brain metastases?",
+    category: "Colorectal (mCRC)",
+    title: "Brain Metastases Stability",
+    description: "Eligibility for pre-treated asymptomatic CNS lesions & MRI intervals",
+    prompt:
+      "Which active Phase 2/3 colorectal cancer protocols permit patients with pre-treated, asymptomatic brain metastases, and what is the required MRI stability interval prior to Cycle 1 Day 1?",
   },
   {
-    title: "Lab thresholds",
-    prompt: "What are the acceptable baseline lab thresholds for ANC and platelets?",
+    category: "Hematologic (CAR-T)",
+    title: "Baseline Hematologic Limits",
+    description: "Acceptable ANC and platelet count thresholds across CAR-T studies",
+    prompt:
+      "Compare the baseline hematologic thresholds across our active Phase 1 CAR-T studies. Which protocol allows an absolute neutrophil count (ANC) below 1,000/µL or platelets below 75,000/µL?",
+  },
+  {
+    category: "Breast (TNBC & HER2-Low)",
+    title: "Prior Systemic Therapy Lines",
+    description: "Lines of therapy and first-line refractory acceptance for metastatic patients",
+    prompt:
+      "Which breast cancer trials require patients to have received at least 2 prior lines of systemic therapy in the metastatic setting, and which accept first-line refractory patients?",
   },
 ];
 
@@ -40,7 +62,12 @@ export function ChatContainer({
   threadId,
   onThreadCreated,
   onStreamComplete,
+  isSidebarOpen = true,
+  onToggleSidebar,
 }: ChatContainerProps) {
+  const navigate = useNavigate();
+  const { theme, toggleTheme } = useTheme();
+  const [activeCitation, setActiveCitation] = useState<CitationData | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   /** Citation data keyed by message ID for interactive pills. */
@@ -203,6 +230,54 @@ export function ChatContainer({
 
   return (
     <div className="flex-1 flex flex-col h-full bg-void overflow-hidden">
+      {/* ── Persistent Top Header ── */}
+      <header className="h-12 border-b border-ash bg-graphite/40 backdrop-blur-sm px-4 flex items-center justify-between shrink-0 select-none z-10">
+        <div className="flex items-center gap-2.5">
+          {!isSidebarOpen && onToggleSidebar && (
+            <button
+              type="button"
+              onClick={onToggleSidebar}
+              className="p-1.5 rounded-md text-fog hover:text-cloud hover:bg-ash/50 transition-colors cursor-pointer mr-1"
+              title="Open sidebar"
+              aria-label="Open sidebar"
+            >
+              <PanelLeft className="w-4 h-4" />
+            </button>
+          )}
+          <div className="w-6 h-6 rounded-md bg-slate-surface border border-ash flex items-center justify-center p-0.5 overflow-hidden shadow-xs">
+            <img src="/logo-genes.png" alt="SCRI Logo" className="w-full h-full object-contain" />
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="font-semibold text-cloud text-[13px] tracking-tight">
+              SCRI Copilot
+            </span>
+            <span className="text-[11px] text-fog hidden sm:inline">
+              Clinical Protocol Assistant
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => navigate("/trials")}
+            className="px-3 py-1 rounded-full text-[11px] font-medium text-cloud bg-slate-surface border border-ash/90 hover:border-teal/50 hover:text-teal hover:bg-teal-dim/20 transition-all cursor-pointer shadow-xs"
+            title="Open Trial Catalog"
+          >
+            Trial Catalog
+          </button>
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="p-1.5 rounded-md text-fog hover:text-cloud hover:bg-ash/40 transition-colors cursor-pointer"
+            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            aria-label="Toggle theme"
+          >
+            {theme === "dark" ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+      </header>
+
       {/* Messages scroll area */}
       <div className="flex-1 overflow-y-auto scrollbar-clinical">
         {historyLoading ? (
@@ -213,12 +288,15 @@ export function ChatContainer({
             </div>
           </div>
         ) : messages.length === 0 ? (
-          /* ── Empty State ── */
-          <div className="h-full flex flex-col items-center justify-center max-w-xl mx-auto text-center px-6">
-            <h2 className="text-[18px] font-semibold text-cloud tracking-tight">
-              Clinical protocol assistant
+          /* ── Empty State with 4 Exemplary Query Cards ── */
+          <div className="min-h-full flex flex-col items-center justify-center max-w-2xl mx-auto text-center px-4 py-8">
+            <div className="w-12 h-12 rounded-xl bg-slate-surface border border-ash flex items-center justify-center p-1.5 mb-3 shadow-xs">
+              <img src="/logo-genes.png" alt="SCRI" className="w-full h-full object-contain" />
+            </div>
+            <h2 className="text-[19px] font-semibold text-cloud tracking-tight">
+              Clinical Protocol Assistant
             </h2>
-            <p className="text-[13px] text-fog mt-2 max-w-sm leading-relaxed">
+            <p className="text-[13px] text-fog mt-1.5 max-w-md leading-relaxed">
               Ask plain-English questions about clinical trial eligibility criteria, washout periods, and biomarker thresholds.
             </p>
 
@@ -229,19 +307,24 @@ export function ChatContainer({
               </div>
             )}
 
-            {/* Suggested prompts */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 w-full mt-7">
-              {QUICK_PROMPTS.map((item, idx) => (
+            {/* 4 Exemplary Queries */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full mt-7 text-left">
+              {EXEMPLARY_QUERIES.map((item, idx) => (
                 <button
                   key={idx}
                   onClick={() => handlePromptClick(item.prompt)}
-                  className="flex flex-col items-start p-3 rounded-lg bg-slate-surface border border-ash hover:border-teal-border text-left transition-all group cursor-pointer"
+                  className="flex flex-col p-3.5 rounded-xl bg-slate-surface border border-ash hover:border-teal/60 hover:shadow-md transition-all group cursor-pointer text-left"
                 >
-                  <span className="text-[11px] font-medium text-teal group-hover:text-teal/80">
+                  <div className="flex items-center justify-between w-full mb-1">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-teal bg-teal-dim px-2 py-0.5 rounded border border-teal-border/40">
+                      {item.category}
+                    </span>
+                  </div>
+                  <span className="text-[13px] font-semibold text-cloud group-hover:text-teal transition-colors mt-0.5">
                     {item.title}
                   </span>
-                  <span className="text-[11px] text-fog mt-1 line-clamp-2">
-                    {item.prompt}
+                  <span className="text-[11px] text-fog mt-1 leading-relaxed line-clamp-2">
+                    {item.description}
                   </span>
                 </button>
               ))}
@@ -271,6 +354,7 @@ export function ChatContainer({
                       createdAt={m.createdAt ? m.createdAt.toISOString() : undefined}
                       isStreaming={isLastAssistant && isLoading}
                       citations={messageCitations}
+                      onSelectCitation={(citation) => setActiveCitation(citation)}
                     />
                   </div>
                 );
@@ -296,6 +380,12 @@ export function ChatContainer({
         handleSubmit={handleSubmit}
         isLoading={isLoading}
         stop={stop}
+      />
+
+      {/* Slide-over Citation Drawer */}
+      <CitationDrawer
+        citation={activeCitation}
+        onClose={() => setActiveCitation(null)}
       />
     </div>
   );

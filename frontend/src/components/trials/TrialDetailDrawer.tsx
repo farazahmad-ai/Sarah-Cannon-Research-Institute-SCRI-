@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { X, ExternalLink } from "lucide-react";
 import { api, type TrialDetail } from "@/lib/api";
 import { formatCategory } from "./TrialCard";
 
@@ -74,27 +74,46 @@ export function TrialDetailDrawer({ nctId, onClose }: TrialDetailDrawerProps) {
       />
 
       {/* Drawer panel */}
-      <div className="fixed right-0 top-0 h-full w-full max-w-xl bg-graphite border-l border-ash z-50 flex flex-col animate-in slide-in-from-right duration-250">
+      <div className="fixed right-0 top-0 h-full w-full max-w-xl bg-slate-surface border-l border-ash z-50 flex flex-col shadow-2xl animate-slide-in-right">
         {/* Header */}
-        <div className="flex items-start justify-between px-5 py-4 border-b border-ash shrink-0">
+        <div className="flex items-start justify-between px-5 py-4 border-b border-ash bg-graphite/60 shrink-0">
           <div className="min-w-0 flex-1 pr-3">
-            <span className="font-mono text-[11px] text-teal font-medium">
-              {nctId}
-            </span>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="font-mono text-[12px] text-teal font-semibold bg-teal-dim border border-teal-border px-2 py-0.5 rounded">
+                {nctId}
+              </span>
+              {trial?.status && (
+                <span className="text-[10px] text-fog bg-ash/40 px-2 py-0.5 rounded font-medium">
+                  {formatSectionType(trial.status)}
+                </span>
+              )}
+            </div>
             {trial && (
-              <h2 className="text-[14px] font-medium text-cloud leading-snug mt-1.5 line-clamp-3">
+              <h2 className="text-[14px] font-semibold text-cloud leading-snug line-clamp-3">
                 {trial.official_title ?? trial.brief_title}
               </h2>
             )}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-md text-fog hover:text-cloud hover:bg-ash/60 transition-colors shrink-0 cursor-pointer"
-            aria-label="Close drawer"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            <a
+              href={`https://clinicaltrials.gov/study/${nctId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1.5 rounded-md text-fog hover:text-cloud hover:bg-ash/60 transition-colors"
+              title="Open protocol on ClinicalTrials.gov"
+            >
+              <ExternalLink className="w-4 h-4" />
+            </a>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-md text-fog hover:text-cloud hover:bg-ash/60 transition-colors cursor-pointer"
+              title="Close drawer (Esc)"
+              aria-label="Close drawer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Content */}

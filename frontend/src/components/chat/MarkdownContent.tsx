@@ -18,12 +18,19 @@ import { CitationPill, type CitationData } from "@/components/citations/Citation
 interface MarkdownContentProps {
   content: string;
   citationMap: Map<string, CitationData>;
+  citationNumberMap?: Map<string, number>;
+  onSelectCitation?: (citation: CitationData) => void;
 }
 
 /** Parse inline tokens: citations, bold, italic, code */
-function renderInline(text: string, citationMap: Map<string, CitationData>): React.ReactNode[] {
+function renderInline(
+  text: string,
+  citationMap: Map<string, CitationData>,
+  citationNumberMap?: Map<string, number>,
+  onSelectCitation?: (citation: CitationData) => void
+): React.ReactNode[] {
   // Regex to match:
-  // 1. Citations: [NCT01234567, Section Name]
+  // 1. Citations: [NCT01234567, Section Name] or [1]
   // 2. Bold: **text**
   // 3. Inline code: `text`
   // 4. Italic: *text* or _text_
@@ -39,16 +46,32 @@ function renderInline(text: string, citationMap: Map<string, CitationData>): Rea
     // 1. Citation check: [NCT12345678, ...]
     if (/^\[NCT\d{8}/i.test(part) && part.endsWith("]")) {
       const citation = citationMap.get(part);
-      elements.push(
-        <CitationPill key={`cit-${i}-${part}`} label={part} citation={citation} />
-      );
+      if (citation && onSelectCitation) {
+        const key = `${citation.nct_id}:${citation.section_header}`;
+        const num = citationNumberMap?.get(key) ?? citation.citation_index ?? 1;
+        elements.push(
+          <button
+            key={`cit-${i}-${part}`}
+            type="button"
+            onClick={() => onSelectCitation(citation)}
+            className="inline-flex items-center justify-center font-mono text-[10px] font-bold text-teal bg-teal-dim border border-teal-border hover:bg-teal hover:text-void rounded px-1.5 py-0.2 mx-0.5 align-baseline transition-all cursor-pointer shadow-xs select-none"
+            title={`${citation.nct_id}: ${citation.section_header} (Click to inspect protocol)`}
+          >
+            [{num}]
+          </button>
+        );
+      } else {
+        elements.push(
+          <CitationPill key={`cit-${i}-${part}`} label={part} citation={citation} />
+        );
+      }
     }
     // 2. Bold: **text**
     else if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
       const inner = part.slice(2, -2);
       elements.push(
         <strong key={`b-${i}`} className="font-semibold text-cloud">
-          {renderInline(inner, citationMap)}
+          {renderInline(inner, citationMap, citationNumberMap, onSelectCitation)}
         </strong>
       );
     }
@@ -71,7 +94,7 @@ function renderInline(text: string, citationMap: Map<string, CitationData>): Rea
     ) {
       elements.push(
         <em key={`em-${i}`} className="italic text-cloud/90">
-          {renderInline(part.slice(1, -1), citationMap)}
+          {renderInline(part.slice(1, -1), citationMap, citationNumberMap, onSelectCitation)}
         </em>
       );
     }
@@ -84,7 +107,12 @@ function renderInline(text: string, citationMap: Map<string, CitationData>): Rea
   return elements;
 }
 
-export function MarkdownContent({ content, citationMap }: MarkdownContentProps) {
+export function MarkdownContent({
+  content,
+  citationMap,
+  citationNumberMap,
+  onSelectCitation,
+}: MarkdownContentProps) {
   if (!content) return null;
 
   // Split into lines
@@ -103,7 +131,7 @@ export function MarkdownContent({ content, citationMap }: MarkdownContentProps) 
         <ul key={`ul-${key}`} className="my-2 space-y-1.5 pl-4 list-disc marker:text-teal">
           {items.map((item, idx) => (
             <li key={idx} className="leading-relaxed text-cloud text-[13px]">
-              {renderInline(item, citationMap)}
+              {renderInline(item, citationMap, citationNumberMap, onSelectCitation)}
             </li>
           ))}
         </ul>
@@ -113,7 +141,7 @@ export function MarkdownContent({ content, citationMap }: MarkdownContentProps) 
         <ol key={`ol-${key}`} className="my-2 space-y-1.5 pl-4 list-decimal marker:text-teal font-mono text-[12px]">
           {items.map((item, idx) => (
             <li key={idx} className="leading-relaxed text-cloud text-[13px] font-sans">
-              {renderInline(item, citationMap)}
+              {renderInline(item, citationMap, citationNumberMap, onSelectCitation)}
             </li>
           ))}
         </ol>
@@ -136,7 +164,7 @@ export function MarkdownContent({ content, citationMap }: MarkdownContentProps) 
       flushList(idx);
       nodes.push(
         <h4 key={`h4-${idx}`} className="font-semibold text-[13px] text-cloud tracking-tight mt-3 mb-1">
-          {renderInline(trimmed.slice(4), citationMap)}
+          {renderInline(trimmed.slice(4), citationMap, citationNumberMap, onSelectCitation)}
         </h4>
       );
       continue;
@@ -147,7 +175,7 @@ export function MarkdownContent({ content, citationMap }: MarkdownContentProps) 
       flushList(idx);
       nodes.push(
         <h3 key={`h3-${idx}`} className="font-semibold text-[14px] text-cloud tracking-tight mt-3.5 mb-1.5">
-          {renderInline(trimmed.slice(3), citationMap)}
+          {renderInline(trimmed.slice(3), citationMap, citationNumberMap, onSelectCitation)}
         </h3>
       );
       continue;
@@ -158,7 +186,7 @@ export function MarkdownContent({ content, citationMap }: MarkdownContentProps) 
       flushList(idx);
       nodes.push(
         <h2 key={`h2-${idx}`} className="font-bold text-[15px] text-cloud tracking-tight mt-4 mb-2">
-          {renderInline(trimmed.slice(2), citationMap)}
+          {renderInline(trimmed.slice(2), citationMap, citationNumberMap, onSelectCitation)}
         </h2>
       );
       continue;
@@ -191,7 +219,7 @@ export function MarkdownContent({ content, citationMap }: MarkdownContentProps) 
       flushList(idx);
       nodes.push(
         <div key={`bq-${idx}`} className="my-2 pl-3 border-l-2 border-teal/40 text-fog text-[12px] italic">
-          {renderInline(trimmed.slice(2), citationMap)}
+          {renderInline(trimmed.slice(2), citationMap, citationNumberMap, onSelectCitation)}
         </div>
       );
       continue;
@@ -201,7 +229,7 @@ export function MarkdownContent({ content, citationMap }: MarkdownContentProps) 
     flushList(idx);
     nodes.push(
       <p key={`p-${idx}`} className="my-1.5 leading-relaxed text-cloud text-[13px]">
-        {renderInline(trimmed, citationMap)}
+        {renderInline(trimmed, citationMap, citationNumberMap, onSelectCitation)}
       </p>
     );
   }

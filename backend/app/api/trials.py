@@ -73,7 +73,7 @@ async def get_trial_by_nct_id(
             id=c.id,
             nct_id=c.nct_id,
             section_type=c.section_type,
-            section_title=c.section_title,
+            section_title=c.section_header,
             chunk_index=c.chunk_index,
             chunk_text=c.chunk_text,
             token_count=c.token_count,

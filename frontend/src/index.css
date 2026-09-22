@@ -12,17 +12,17 @@
  * Light mode: ChatGPT-style clean whites and warm grays.
  */
 
-/* ── Dark Mode (default) ── */
+/* ── Dark Mode (Claude-inspired warm charcoal & stone) ── */
 :root {
-  --void: #0a0a0f;
-  --graphite: #111117;
-  --slate-surface: #1a1a24;
-  --ash: #2a2a36;
-  --fog: #6b6b80;
-  --cloud: #e0e0ea;
+  --void: #1c1b19;
+  --graphite: #151413;
+  --slate-surface: #262522;
+  --ash: #3a3834;
+  --fog: #9c978f;
+  --cloud: #f5f4ef;
   --teal: #2dd4a8;
   --teal-dim: rgba(45, 212, 168, 0.12);
-  --teal-border: rgba(45, 212, 168, 0.25);
+  --teal-border: rgba(45, 212, 168, 0.28);
   --danger: #f87171;
   --danger-dim: rgba(248, 113, 113, 0.12);
   --amber: #fbbf24;
@@ -49,7 +49,7 @@
   --popover: var(--slate-surface);
   --popover-foreground: var(--cloud);
   --primary: var(--teal);
-  --primary-foreground: #0a0a0f;
+  --primary-foreground: #1c1b19;
   --secondary: var(--ash);
   --secondary-foreground: var(--cloud);
   --muted: var(--ash);
@@ -69,24 +69,24 @@
   --sidebar: var(--graphite);
   --sidebar-foreground: var(--cloud);
   --sidebar-primary: var(--teal);
-  --sidebar-primary-foreground: #0a0a0f;
+  --sidebar-primary-foreground: #1c1b19;
   --sidebar-accent: var(--teal-dim);
   --sidebar-accent-foreground: var(--teal);
   --sidebar-border: var(--ash);
   --sidebar-ring: var(--teal-border);
 }
 
-/* ── Light Mode — ChatGPT-inspired clean whites ── */
+/* ── Light Mode — ChatGPT-inspired clean black and white ── */
 :root[data-theme="light"] {
   --void: #ffffff;
-  --graphite: #f9f9f9;
+  --graphite: #f7f7f8;
   --slate-surface: #ffffff;
   --ash: #e5e5e5;
-  --fog: #6e6e80;
+  --fog: #5c5c66;
   --cloud: #0d0d0d;
   --teal: #0d9373;
   --teal-dim: rgba(13, 147, 115, 0.08);
-  --teal-border: rgba(13, 147, 115, 0.25);
+  --teal-border: rgba(13, 147, 115, 0.28);
   --danger: #ef4444;
   --danger-dim: rgba(239, 68, 68, 0.08);
   --amber: #f59e0b;
@@ -212,5 +212,21 @@
   }
   .scrollbar-clinical::-webkit-scrollbar-thumb:hover {
     background: var(--fog);
+  }
+
+  /* Slide-in drawer animation */
+  @keyframes slideInRight {
+    from {
+      transform: translateX(100%);
+      opacity: 0.7;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  .animate-slide-in-right {
+    animation: slideInRight 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 }
