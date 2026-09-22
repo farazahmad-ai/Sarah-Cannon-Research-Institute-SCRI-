@@ -72,3 +72,157 @@ uv run data/download.py
 ```
 
 By default, this queries the latest landmark interventional oncology trials across 5 core SCRI disease areas (NSCLC, Lymphoma/CAR-T, Colorectal, Breast, and Melanoma), saves structured protocol JSONs and readable text documents under `data/downloads/`, and generates `data/downloads/manifest.json`.
+
+---
+
+## 🚀 How to Run the Application
+
+To run the entire system locally, you will run the **Backend API** in one terminal and the **Frontend SPA** in a second terminal.
+
+### ⚡ Quick Reference (At a Glance)
+
+| Service | Directory | First-Time Setup | Run Command | Default URL |
+| :--- | :--- | :--- | :--- | :--- |
+| **Backend API** | `backend/` | `cp .env.example .env`<br>`uv sync`<br>`uv run python -m alembic upgrade head` | `uv run python -m uvicorn app.main:app --reload --port 8000` | [http://localhost:8000/docs](http://localhost:8000/docs) |
+| **Frontend SPA** | `frontend/` | `cp .env.example .env`<br>`pnpm install` | `pnpm dev` | [http://localhost:5173](http://localhost:5173) |
+| **Trial Ingestion** | `backend/` | `uv run data/download.py` | `uv run python -m app.ingest.pipeline` | _Seeds Supabase pgvector_ |
+
+---
+
+### Step 1: Running the Backend (Terminal 1)
+
+#### 1.1 Environment Setup
+Navigate to the `backend/` directory and configure your environment file:
+
+```bash
+cd backend
+cp .env.example .env
+```
+*(On Windows PowerShell: `Copy-Item .env.example .env`)*
+
+Configure the following required variables inside `backend/.env`:
+- `SUPABASE_URL` — Supabase Project URL (`https://<project-ref>.supabase.co`)
+- `SUPABASE_ANON_KEY` — Supabase anon public key
+- `SUPABASE_SERVICE_ROLE_KEY` — Supabase service role secret key
+- `DATABASE_URL` — Supabase Postgres direct session connection string (port 5432):
+  `postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres`
+- `OPENAI_API_KEY` — OpenAI or OpenRouter API key
+
+#### 1.2 Install Dependencies & Apply Database Migrations
+```bash
+# Sync dependencies into local virtual environment
+uv sync
+
+# Run database migrations to provision tables, pgvector extension, and search indexes
+uv run python -m alembic upgrade head
+```
+
+#### 1.3 (Optional / First Time) Ingest Oncology Clinical Trials
+If you need to seed the vector database with landmark clinical trial protocols:
+```bash
+# From project root: download active trial protocols from ClinicalTrials.gov
+uv run data/download.py
+
+# In backend/: chunk protocols, generate embeddings, and upsert to Supabase
+uv run python -m app.ingest.pipeline
+```
+
+#### 1.4 Start the Backend Server
+Run the API server with module mode:
+
+```bash
+uv run python -m uvicorn app.main:app --reload --port 8000
+```
+
+> [!TIP]
+> **Windows Note:** Always use `uv run python -m uvicorn ...` instead of `uv run uvicorn ...`. Direct invocation of the script trampoline on Windows can fail with `error: uv trampoline failed to canonicalize script path`. Running Python module mode (`python -m <module>`) circumvents this issue completely.
+
+*Alternatively, you can run directly:*
+```bash
+uv run python -m app.main
+```
+
+The backend is now live:
+- **Interactive Swagger Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
+- **ReDoc Documentation:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
+- **Health Check Endpoint:** [http://localhost:8000/health](http://localhost:8000/health)
+
+---
+
+### Step 2: Running the Frontend (Terminal 2)
+
+Open a **new terminal** window or tab:
+
+#### 2.1 Environment Setup
+Navigate to the `frontend/` directory and configure your environment file:
+
+```bash
+cd frontend
+cp .env.example .env
+```
+*(On Windows PowerShell: `Copy-Item .env.example .env`)*
+
+Verify that `frontend/.env` contains:
+```dotenv
+VITE_API_BASE_URL=http://localhost:8000
+VITE_SUPABASE_URL=https://<project-ref>.supabase.co
+VITE_SUPABASE_ANON_KEY=<your-anon-key>
+```
+
+#### 2.2 Install Dependencies
+Install packages using **pnpm** (the mandatory package manager):
+
+```bash
+pnpm install
+```
+
+#### 2.3 Start the Development Server
+```bash
+pnpm dev
+```
+
+The frontend application will now be running at:
+- **Web App:** [http://localhost:5173](http://localhost:5173)
+
+---
+
+## 🛠️ Helpful Development Commands
+
+### Backend
+```bash
+# Run backend test suite
+cd backend
+uv run python -m pytest
+
+# Check & format code style
+uv run python -m ruff check .
+uv run python -m ruff format .
+
+# Create a new Alembic migration after modifying models
+uv run python -m alembic revision --autogenerate -m "describe_changes"
+```
+
+### Frontend
+```bash
+cd frontend
+
+# Run TypeScript typecheck without emitting files
+pnpm tsc --noEmit
+
+# Run ESLint
+pnpm lint
+
+# Build production bundle
+pnpm build
+```
+
+---
+
+## 📖 Additional Documentation
+
+- [Setup & Architecture Guide](docs/guide.md) — Comprehensive infrastructure and architectural walkthrough.
+- [Backend README](backend/README.md) — Detailed backend operations and database guide.
+- [Frontend README](frontend/README.md) — Frontend architecture and component standards.
+- [Clinical Project Brief](docs/project-brief.md) — Clinical background and requirements.
+- [Todos & Roadmap](docs/todos.md) — Implementation roadmap and phase checklist.
+

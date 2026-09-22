@@ -1,75 +1,65 @@
-# React + TypeScript + Vite
+# SCRI Oncology Copilot — Frontend SPA
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The React 18+ Single Page Application (SPA) for the **Sarah Cannon Research Institute (SCRI) Oncology Copilot**. Built with Vite, TypeScript, Tailwind CSS, shadcn/ui, and Supabase Auth.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🚀 Quickstart
 
-## React Compiler
+### 1. Prerequisites
+- Node.js 20+ (LTS)
+- [`pnpm`](https://pnpm.io/) package manager (mandatory per project standards)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 2. Environment Setup
+Copy the example environment file:
 
-## Expanding the ESLint configuration
+```bash
+cp .env.example .env
+```
+*(On Windows PowerShell: `Copy-Item .env.example .env`)*
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Ensure the following variables are populated in `frontend/.env`:
+```dotenv
+# Backend API base URL
+VITE_API_BASE_URL=http://localhost:8000
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+# Supabase Auth credentials (browser-safe public keys only)
+VITE_SUPABASE_URL=https://<your-project-ref>.supabase.co
+VITE_SUPABASE_ANON_KEY=<your-anon-public-key>
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+> [!WARNING]
+> Never place the `SUPABASE_SERVICE_ROLE_KEY` or direct database connection strings in `frontend/.env`. Only public, browser-safe keys belong here.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+### 3. Install Dependencies
+```bash
+pnpm install
 ```
+
+### 4. Run Development Server
+```bash
+pnpm dev
+```
+
+The application will start on [http://localhost:5173](http://localhost:5173).
+
+---
+
+## 🛠️ Available Scripts
+
+| Command | Description |
+| :--- | :--- |
+| `pnpm dev` | Starts Vite local development server with hot module replacement (HMR) |
+| `pnpm build` | Typechecks with `tsc -b` and builds production bundle in `dist/` |
+| `pnpm preview` | Serves local production build for previewing |
+| `pnpm lint` | Runs ESLint over project files |
+| `pnpm tsc --noEmit` | Runs TypeScript type checker without building |
+
+---
+
+## 🛡️ Architecture & Rules
+
+- **Single Source of Truth for Config:** All environment variables are validated and exported through [src/lib/env.ts](file:///d:/FarazAhmad-ai/projects/Sarah%20Cannon%20Research%20Institute%20%28SCRI%29/frontend/src/lib/env.ts). Never read `import.meta.env` directly in components.
+- **Package Discipline:** Use `pnpm` exclusively (`minimum-release-age=10080`). Do not install `axios`, `lodash`, or `moment`.
+- **UI & Styling:** Built with Tailwind CSS and shadcn/ui components for clean, accessible clinical UI primitives.
+

@@ -53,19 +53,19 @@ Once the server is running:
 
 ### Run Unit Tests
 ```bash
-uv run pytest
+uv run python -m pytest
 ```
 
 ### Run Linters & Formatter
 ```bash
 # Check code style
-uv run ruff check .
+uv run python -m ruff check .
 
 # Automatically fix lint issues
-uv run ruff check --fix .
+uv run python -m ruff check --fix .
 
 # Format code
-uv run ruff format .
+uv run python -m ruff format .
 ```
 
 ---
@@ -76,16 +76,16 @@ Database schema is tracked using Alembic against Supabase Postgres (`pgvector` e
 
 ```bash
 # Check current migration revision
-uv run alembic current
+uv run python -m alembic current
 
 # Apply all pending migrations to database
-uv run alembic upgrade head
+uv run python -m alembic upgrade head
 
 # Generate a new migration after editing SQLAlchemy models
-uv run alembic revision --autogenerate -m "add_table_or_field_name"
+uv run python -m alembic revision --autogenerate -m "add_table_or_field_name"
 
 # Rollback one migration step
-uv run alembic downgrade -1
+uv run python -m alembic downgrade -1
 ```
 
 ---

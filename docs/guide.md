@@ -184,7 +184,7 @@ Always review the generated migration script. Add explicit operations for Supaba
 #### Apply migrations:
 
 ```bash
-uv run alembic upgrade head
+uv run python -m alembic upgrade head
 ```
 
 ---
@@ -196,8 +196,8 @@ Run the backend service locally:
 ```bash
 cd backend
 uv sync
-uv run alembic upgrade head
-uv run uvicorn app.main:app --reload --port 8000
+uv run python -m alembic upgrade head
+uv run python -m uvicorn app.main:app --reload --port 8000
 ```
 
 ---
@@ -220,7 +220,7 @@ packages = ["app"]
 #### Preferred API server command:
 ```bash
 cd backend
-uv run uvicorn app.main:app --reload
+uv run python -m uvicorn app.main:app --reload
 ```
 
 #### Direct file execution:
@@ -394,7 +394,7 @@ uv run alembic upgrade head
 uv run python -m app.ingest.pipeline
 
 # 5. Start Backend API
-uv run uvicorn app.main:app --reload --port 8000
+uv run python -m uvicorn app.main:app --reload --port 8000
 
 # 6. In a separate terminal, configure and start Frontend SPA
 cd ../frontend
