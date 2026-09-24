@@ -31,9 +31,12 @@ class ChatRequest(BaseModel):
         default=None,
         description="Target thread UUID. If None, a new thread is automatically created.",
     )
+    # S7: Cap input length to prevent oversized prompts from exhausting
+    # embedding tokens, LLM context window, and database storage.
     message: str = Field(
         ...,
         min_length=1,
+        max_length=4000,
         description="Clinical query or patient screening prompt.",
     )
 

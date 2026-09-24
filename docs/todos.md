@@ -413,7 +413,55 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
     - [x] Verify database test thread cleanup (0 residue left behind)
   - [x] File: `backend/tests/test_pilot_readiness.py`:
     - [x] Stress & adversarial suite (53 offline + live integration tests) covering prompt injection inside protocol text, malformed citations, sanitizer idempotence, multi-turn grounding, client disconnect persistence (D-3), and cross-tenant isolation
-- [ ] **7.2 Deployment Configuration:**
+- [x] **7.2 Pre-Deployment Security Hardening:**
+  *All findings from the security audit resolved before going live on Render.*
+
+  **🔴 Critical**
+
+  - [x] **S1 — Restrict CORS Methods & Headers** *(File: `backend/app/main.py`)*:
+    - Replace `allow_methods=["*"]` with `["GET", "POST", "DELETE", "OPTIONS"]`
+    - Replace `allow_headers=["*"]` with `["Authorization", "Content-Type"]`
+    - Risk: wildcard methods + `allow_credentials=True` widens the cross-origin attack surface beyond what the API actually uses
+
+  - [x] **S2 — Lock Down Swagger/Redoc Exposure** *(File: `backend/app/main.py`)*:
+    - Change `docs_url`/`redoc_url` to expose only when `settings.DEBUG is True` (not environment-gated)
+    - Current logic exposes docs for any `ENVIRONMENT` value that isn't exactly `"production"` — a typo like `"prod"` or `"Production"` leaks the full API schema publicly
+    - ```diff
+      - docs_url="/docs" if settings.ENVIRONMENT != "production" or settings.DEBUG else None,
+      + docs_url="/docs" if settings.DEBUG else None,
+      ```
+
+  - [x] **S3 — Strip Internal Config from Health Endpoint** *(File: `backend/app/main.py`)*:
+    - Remove `environment`, `chat_model`, and `embedding_model` from the `/health` response
+    - Keep only `status` and `app_name` — load balancers need a 200, not your AI provider and model routing details
+    - Risk: anonymous visitors learn your LLM provider, model names, and environment mode
+
+  **🟠 High**
+
+  - [x] **S4 — Add Rate Limiting to LLM-Backed Endpoints**:
+    - Created `backend/app/middleware/rate_limit.py` with a sliding-window per-user limiter
+    - Cap `/api/chat/stream` at ~30 requests per 60s per user to prevent OpenAI/OpenRouter credit exhaustion
+    - Registered as middleware in `main.py` after `CORSMiddleware`
+
+  - [x] **S5 — Prevent Debug/Reload in Production** *(File: `backend/app/main.py`)*:
+    - Changed `reload=settings.DEBUG or settings.ENVIRONMENT == "development"` to `reload=settings.ENVIRONMENT == "development" and settings.DEBUG`
+    - Ensure Render start command uses: `uvicorn app.main:app --host 0.0.0.0 --port $PORT` (never `python -m`)
+
+  **🟡 Medium**
+
+  - [x] **S6 — Add Security Headers Middleware**:
+    - Created `backend/app/middleware/security_headers.py` setting `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Strict-Transport-Security: max-age=31536000; includeSubDomains`
+    - Registered in `main.py` before `CORSMiddleware`
+
+  - [x] **S7 — Cap Chat Message Input Length** *(File: `backend/app/assistant/schemas.py`)*:
+    - Added `max_length=4000` to `ChatRequest.message` field via `pydantic.Field`
+    - Prevents oversized prompts from exhausting embedding tokens, LLM context, and database storage
+
+  - [x] **S8 — Sanitize Startup Logging** *(File: `backend/app/main.py`)*:
+    - Replaced `print()` calls in lifespan with `logging.getLogger(__name__).info()`
+    - No longer logs the full `ALLOWED_ORIGINS` list or model names — logs only origin count and environment
+
+- [ ] **7.3 Deployment Configuration:**
   - [ ] File: `backend/Dockerfile`: FastAPI Uvicorn container
   - [ ] File: `frontend/Dockerfile` & `frontend/nginx.conf`: Vite static build served via Nginx
-  - [ ] File: `railway.toml`: Containerized orchestration for Railway deployment
+  - [ ] Configure Render services (or `render.yaml` blueprint) for containerized backend + static frontend

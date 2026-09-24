@@ -5,6 +5,7 @@ for the React/Vite frontend, and defines fundamental health and diagnostic endpo
 All configuration parameters are pulled directly from `app.config.settings`.
 """
 
+import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -15,6 +16,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.router import api_router
 from app.config import settings
 from app.database import init_supabase_admin
+from app.middleware.rate_limit import RateLimitMiddleware
+from app.middleware.security_headers import SecurityHeadersMiddleware
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -27,18 +32,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     before handling coordinator traffic, and gracefully closed upon termination.
     """
     # Startup phase: Log environment status and verify active settings
-    print(f"[STARTUP] Starting {settings.APP_NAME} in [{settings.ENVIRONMENT}] mode")
-    print(f"[CONFIG] Primary LLM: {settings.OPENAI_CHAT_MODEL} | Embedding: {settings.OPENAI_EMBEDDING_MODEL}")
-    print(f"[SECURITY] Allowed CORS Origins: {settings.ALLOWED_ORIGINS}")
+    # S8: Use structured logging; avoid printing sensitive config (model names, origin list)
+    logger.info("Starting %s in [%s] mode", settings.APP_NAME, settings.ENVIRONMENT)
+    logger.info("CORS origins configured: %d origin(s)", len(settings.ALLOWED_ORIGINS))
     
     # Eagerly initialize and validate Supabase AsyncClient (Fail-Fast)
     await init_supabase_admin()
-    print("[AUTH] Supabase AsyncClient initialized successfully (persist_session=False)")
+    logger.info("Supabase AsyncClient initialized successfully (persist_session=False)")
     
     yield  # Application is running and serving requests
     
     # Shutdown phase: Clean up connection pools and background tasks
-    print(f"[SHUTDOWN] Shutting down {settings.APP_NAME}...")
+    logger.info("Shutting down %s...", settings.APP_NAME)
 
 
 def create_application() -> FastAPI:
@@ -55,21 +60,33 @@ def create_application() -> FastAPI:
             "Provides grounded, citation-backed answers to oncology trial inclusion/exclusion screening."
         ),
         version="0.1.0",
-        docs_url="/docs" if settings.ENVIRONMENT != "production" or settings.DEBUG else None,
-        redoc_url="/redoc" if settings.ENVIRONMENT != "production" or settings.DEBUG else None,
+        # S2: Only expose API docs when DEBUG is explicitly True. Environment-name
+        # gating was fragile — a typo like "prod" would leak the full schema.
+        docs_url="/docs" if settings.DEBUG else None,
+        redoc_url="/redoc" if settings.DEBUG else None,
         lifespan=lifespan,
     )
+
+    # S6: Security headers (HSTS, X-Frame-Options, etc.) — registered first so
+    # headers are present on every response including CORS preflight.
+    application.add_middleware(SecurityHeadersMiddleware)
 
     # Configure Cross-Origin Resource Sharing (CORS)
     # Super necessary: Browser security forbids Vite SPA (e.g. localhost:5173) from calling
     # the backend API unless explicit Access-Control-Allow-* headers are granted.
+    # S1: Restrict to only the HTTP methods and headers the API actually uses,
+    # rather than wildcard "*" which widens the attack surface with credentials.
     application.add_middleware(
         CORSMiddleware,
         allow_origins=settings.ALLOWED_ORIGINS,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type"],
     )
+
+    # S4: Per-user rate limiting on LLM-backed endpoints to prevent
+    # OpenAI/OpenRouter credit exhaustion from runaway requests.
+    application.add_middleware(RateLimitMiddleware)
 
     application.include_router(api_router)
 
@@ -89,15 +106,14 @@ app = create_application()
 async def health_check() -> dict[str, Any]:
     """Return health and status diagnostics for the copilot backend.
     
-    Used by load balancers, container health monitors (Railway/Docker),
+    Used by load balancers, container health monitors (Render/Docker),
     and frontend ping checks to verify API availability.
+    S3: Stripped internal config (model names, environment) — load balancers
+    only need a 200; anonymous visitors don't need our AI provider details.
     """
     return {
         "status": "healthy",
         "app_name": settings.APP_NAME,
-        "environment": settings.ENVIRONMENT,
-        "chat_model": settings.OPENAI_CHAT_MODEL,
-        "embedding_model": settings.OPENAI_EMBEDDING_MODEL,
     }
 
 
@@ -120,9 +136,12 @@ async def root() -> dict[str, str]:
 if __name__ == "__main__":
     import uvicorn
 
+    # S5: Require BOTH development environment AND explicit DEBUG flag for
+    # hot-reload. Prevents accidental reload in production if started via
+    # `python -m` instead of the recommended `uvicorn app.main:app`.
     uvicorn.run(
         "app.main:app",
         host=settings.HOST,
         port=settings.PORT,
-        reload=settings.DEBUG or settings.ENVIRONMENT == "development",
+        reload=settings.ENVIRONMENT == "development" and settings.DEBUG,
     )
