@@ -65,7 +65,7 @@ The pilot corpus consists of **25 landmark interventional oncology trials** (5 p
 
 ## Architecture & Integration Boundaries
 
-- **Web Frontend:** Vite + React + TypeScript + Tailwind CSS (hosted on Railway).
+- **Web Frontend:** Vite + React + TypeScript + Tailwind CSS (hosted on Render).
 - **Backend Service:** FastAPI + PydanticAI + OpenAI embeddings and generation.
 - **Database & Retrieval:** Supabase Postgres (`pgvector` for semantic search + Postgres full-text search with Reciprocal Rank Fusion).
 - **Authentication:** Supabase Auth (institutional email restricted to `@scri.com` / `@hcahealthcare.com`).

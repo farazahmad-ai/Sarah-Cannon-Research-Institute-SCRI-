@@ -20,7 +20,7 @@ Full clinical case study & brief: [docs/project-brief.md](docs/project-brief.md)
 | Migrations | SQLAlchemy models + Alembic |
 | Retrieval | Supabase `pgvector` + Postgres full-text search (RRF fusion) |
 | Auth | Supabase Auth (institutional email) |
-| Hosting | Railway (backend API + frontend SPA) |
+| Hosting | Render (backend Web Service + frontend Static Site) |
 | LLM + embeddings | OpenAI / OpenRouter (`text-embedding-3-small` + `gpt-4o`) |
 
 ## Repo Layout

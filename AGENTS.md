@@ -40,7 +40,7 @@ The declared enterprise stack for this deployment:
 | **Frontend** | React 18+ / Vite / TypeScript (strict) | Single Page Application (SPA), no SSR / Next.js |
 | **Styling & UI** | Tailwind CSS + shadcn/ui | Clean, accessible clinical UI primitives |
 | **Client Streaming** | Native fetch SSE (ReadableStream) | Hand-parsed Vercel AI data-stream frames (`0:`, `3:`, `d:`) in `useChatStream.ts`. `@ai-sdk/react` was removed (D-7) — `useChat` was never used |
-| **Hosting** | Railway | Two containerized services (Backend API + Frontend SPA) |
+| **Hosting** | Render | Web Service (FastAPI) + Static Site (Vite React SPA) |
 
 ---
 

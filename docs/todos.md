@@ -461,7 +461,67 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
     - Replaced `print()` calls in lifespan with `logging.getLogger(__name__).info()`
     - No longer logs the full `ALLOWED_ORIGINS` list or model names — logs only origin count and environment
 
-- [ ] **7.3 Deployment Configuration:**
-  - [ ] File: `backend/Dockerfile`: FastAPI Uvicorn container
-  - [ ] File: `frontend/Dockerfile` & `frontend/nginx.conf`: Vite static build served via Nginx
-  - [ ] Configure Render services (or `render.yaml` blueprint) for containerized backend + static frontend
+- [ ] **7.3 Render Deployment — Infrastructure as Code & Container Assets:**
+  - [ ] **7.3.1 Render Blueprint (`render.yaml`)**:
+    - Infrastructure-as-code specification in repository root orchestrating both services in one click
+    - Define Backend Web Service (`scri-copilot-backend`):
+      - Runtime: `docker` or `python` (Python 3.12)
+      - Root directory: `backend`
+      - Plan: `free` (512 MB RAM / 0.1 vCPU)
+      - Build command: `pip install --upgrade pip && pip install uv && uv sync --no-dev`
+      - Start command: `uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+      - Health check path: `/health`
+    - Define Frontend Static Site (`scri-copilot-frontend`):
+      - Runtime: `static`
+      - Root directory: `frontend`
+      - Plan: `free` (Global edge CDN, 0s spin-down)
+      - Build command: `npm install -g pnpm && pnpm install && pnpm build`
+      - Publish directory: `dist`
+      - SPA rewrite routes: `/*` -> `/index.html` (prevents 404 on direct navigation to `/chat` or `/trials`)
+  - [ ] **7.3.2 Backend Containerization (`backend/Dockerfile`)**:
+    - Multi-stage or slim Python 3.12 image (`python:3.12-slim`)
+    - Install `uv` binary via `ghcr.io/astral-sh/uv:latest`
+    - Copy `pyproject.toml` and `uv.lock` for deterministic, frozen dependency installation
+    - Ensure dynamic `$PORT` binding so Uvicorn listens on Render's assigned port (`0.0.0.0:$PORT`)
+  - [ ] **7.3.3 Frontend Static Build Verification (`frontend/`)**:
+    - Verify `pnpm build` creates clean production bundle in `frontend/dist/` without TypeScript or lint warnings
+    - Ensure SPA client-side routing fallback (`/*` -> `/index.html`) is active in Render
+
+- [ ] **7.4 Render Environment Configuration & Secrets Management:**
+  - [ ] **7.4.1 Backend Service Environment Variables**:
+    - `PYTHON_VERSION = 3.12.8`
+    - `ENVIRONMENT = production`
+    - `DEBUG = false` (locks down Swagger `/docs` and detailed stack traces)
+    - `HOST = 0.0.0.0`
+    - `SUPABASE_URL = <project-url>`
+    - `SUPABASE_ANON_KEY = <anon-key>`
+    - `SUPABASE_SERVICE_ROLE_KEY = <service-role-key>` (secret, server-side only)
+    - `DATABASE_URL = <direct-postgres-connection-port-5432>` (required for session-level vector queries)
+    - `OPENAI_API_KEY = <openai-or-openrouter-key>`
+    - `OPENAI_CHAT_MODEL = gpt-4o`
+    - `OPENAI_EMBEDDING_MODEL = text-embedding-3-small`
+    - `ALLOWED_ORIGINS = https://scri-copilot.onrender.com,http://localhost:5173`
+  - [ ] **7.4.2 Frontend Static Site Build-Time Environment Variables**:
+    - `VITE_API_BASE_URL = https://scri-copilot-backend.onrender.com` (Render Web Service public URL)
+    - `VITE_SUPABASE_URL = <project-url>`
+    - `VITE_SUPABASE_ANON_KEY = <anon-key>`
+    - *Note:* Must be configured in Render before running the build step so Vite statically injects them into the bundle.
+
+- [ ] **7.5 Post-Deployment Verification, CORS Handshake & Health:**
+  - [ ] **7.5.1 Backend Health & Smoke Testing**:
+    - Query `GET https://scri-copilot-backend.onrender.com/health` to confirm HTTP 200 `{"status": "healthy", "app_name": "SCRI Oncology Copilot"}`
+    - Verify `/docs` returns HTTP 404 (Swagger disabled in production)
+    - Verify database connectivity to Supabase and pgvector index
+  - [ ] **7.5.2 Cross-Origin Handshake (CORS)**:
+    - Update backend `ALLOWED_ORIGINS` with the finalized Render frontend domain
+    - Verify pre-flight `OPTIONS` requests pass with `Access-Control-Allow-Origin`
+  - [ ] **7.5.3 End-to-End Clinical Screening Validation**:
+    - Test coordinator login at `https://scri-copilot.onrender.com/login`
+    - Browse 25 landmark trials in `/trials` catalog
+    - Ask benchmark question (e.g. brain metastases in NSCLC) and verify SSE token streaming (`text/event-stream`)
+    - Inspect interactive citation pills and drawer popovers
+    - Verify off-corpus refusal (e.g. pediatric glioblastoma) triggers deterministic C3 guard
+  - [ ] **7.5.4 Keep-Alive / Cold-Start Mitigation (Free Tier)**:
+    - Set up an automated 10-minute HTTP ping on [cron-job.org](https://cron-job.org) or [uptimerobot.com](https://uptimerobot.com) targeting `https://scri-copilot-backend.onrender.com/health`
+    - Keeps the 512 MB container awake during clinical screening hours, eliminating the 45-50s free tier spin-up delay
+

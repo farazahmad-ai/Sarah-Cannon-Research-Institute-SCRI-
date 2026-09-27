@@ -26,9 +26,9 @@ The architecture separates the interactive clinical chat path from the protocol 
 flowchart LR
     user[Clinical Research Coordinator / MTB Navigator] --> browser[Browser<br/>React SPA + Vite]
 
-    subgraph railway[Railway PaaS]
-        frontend[Frontend Service<br/>Vite Production Build]
-        backend[Backend API<br/>FastAPI + PydanticAI]
+    subgraph render[Render PaaS]
+        frontend[Frontend Static Site<br/>Vite Production Build]
+        backend[Backend Web Service<br/>FastAPI + PydanticAI]
     end
 
     subgraph supabase[Supabase Platform]
@@ -81,7 +81,7 @@ flowchart LR
 | **Embeddings** | OpenAI `text-embedding-3-small` (1536-dim) | Cost-efficient, high-performance semantic representation for medical retrieval |
 | **Primary LLM** | OpenAI `gpt-4o` | Superior medical reasoning, strict adherence to negative constraints (anti-hallucination) |
 | **Authentication** | Supabase Auth | Institutional email sessions (`@scri.com`, `@hcahealthcare.com`), no social OAuth |
-| **Hosting Platform** | Railway | Two containerized services (Frontend SPA + Backend API), automated deployment |
+| **Hosting Platform** | Render | Fast Python Web Service (Backend API) + Global CDN Static Site (Frontend SPA) |
 
 ---
 
@@ -93,9 +93,9 @@ graph TD
         Browser[Client Browser]
     end
 
-    subgraph Railway VPC
-        FE[Frontend Service - Static Assets]
-        BE[Backend API - FastAPI]
+    subgraph Render Cloud
+        FE[Frontend Static Site - CDN]
+        BE[Backend Web Service - FastAPI]
     end
 
     subgraph Managed Cloud
@@ -488,12 +488,12 @@ settings = Settings()
 
 ---
 
-## 14. Deployment Topology (Railway & Supabase)
+## 14. Deployment Topology (Render & Supabase)
 
-The production deployment runs on **Railway** with hosted **Supabase**:
+The production deployment runs on **Render** with hosted **Supabase**:
 
-- **Frontend Service:** Containerized Nginx serving the static Vite production bundle. Connects to the backend via public domain or Railway private networking.
-- **Backend Service:** Containerized Python 3.12 running `uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2`.
+- **Frontend Static Site:** Render Static Site serving the static Vite production bundle over global edge CDN with SPA client routing rewrite (`/* -> /index.html`). Connects to the backend via HTTPS.
+- **Backend Web Service:** Render Web Service (Python 3.12 / Docker) running `uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
 - **Database:** Supabase Managed Postgres (Session Mode port 5432 for Alembic migrations; Transaction Pooler port 6543 for stateless backend requests).
 
 ---

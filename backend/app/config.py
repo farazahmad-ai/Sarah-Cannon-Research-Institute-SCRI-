@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     # When True, enables detailed exception tracebacks in responses (keep False in production)
     DEBUG: bool = False
-    # Network interface to bind Uvicorn (0.0.0.0 allows containerized access on Railway/Docker)
+    # Network interface to bind Uvicorn (0.0.0.0 allows containerized access on Render/Docker)
     HOST: str = "0.0.0.0"
     # Port on which the FastAPI application listens
     PORT: int = 8000
