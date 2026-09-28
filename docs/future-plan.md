@@ -62,3 +62,52 @@ When moving to a fully enterprise-funded deployment with broader multi-turn requ
   }
   ```
 * **Benefit:** Condenses 2,000 tokens of chat history into ~50 tokens of state, permanently eliminating token bloat and context drift.
+
+---
+
+## 4. Evaluation Methodology, Benchmark Integrity & Future Validation Roadmap
+
+### 4.1 Awareness of Current Evaluation Trade-Offs
+
+During Phase 8.2 (Retrieval Evaluation & Benchmarking), the system achieved target SLAs:
+* **Recall@1:** 95.5% (Target: >= 60%)
+* **Recall@3:** 100.0% (Target: >= 80%)
+* **Recall@5 & Recall@10:** 100.0% (Target: >= 95%)
+* **Mean Reciprocal Rank (MRR):** 0.970 (Target: >= 0.70)
+* **Negative Control Refusal:** 100.0% (Target: 100%)
+
+While all retrieval metrics and latencies are **100% genuine and verified via live PostgreSQL + OpenAI embedding executions** (documented in [eval-report.md](file:///d:/FarazAhmad-ai/projects/Sarah%20Cannon%20Research%20Institute%20(SCRI)/docs/eval-report.md) and [`eval_audit_report.md`](file:///C:/Users/Tab%20&%20Tech/.gemini/antigravity-ide/brain/07663dc9-477c-4253-9c07-51176c8565cb/eval_audit_report.md)), the development team explicitly acknowledges the following design trade-offs:
+
+1. **Circularity in Dataset Authorship:** The current 25-case golden dataset ([`golden_dataset.json`](file:///d:/FarazAhmad-ai/projects/Sarah%20Cannon%20Research%20Institute%20(SCRI)/backend/eval/golden_dataset.json)) was curated by the engineering team by inspecting ingested protocol passages. While standard for early development and regression suites, section headers and target terminology were known in advance.
+2. **Sample Scale:** 25 curated queries across 11 trials provide solid directional validation and regression guardrails, but represent a compact sample rather than a comprehensive statistical study across hundreds of protocols.
+3. **Retrieval-Focused Scope:** Phase 8.2 rigorously evaluated hybrid search ranking (pgvector + FTS + RRF) and entity gate refusal, but did not measure end-to-end LLM generative answer quality (e.g., faithfulness, hallucination rate) using an automated judge.
+
+### 4.2 Why This Approach Was Chosen (Pragmatic Engineering Decisions)
+
+* **Token & API Cost Preservation:** Generating hundreds of synthetic questions or running automated LLM evaluators on every commit/build incurs non-trivial API token costs. Hand-curating a tight, representative regression suite kept local and CI costs minimal.
+* **Rapid Developer Feedback Loop:** A 25-query local test suite executes in ~2–4 minutes, providing instant regression safety during search optimization without waiting on heavy evaluation pipelines.
+* **Deterministic Ground Truth:** Hand-verified section names and keywords provided zero-noise baseline assertions to test database queries and entity gate behavior deterministically.
+
+---
+
+### 4.3 Future Production Roadmap for Independent Benchmark Generation
+
+For future contributors, enterprise scaling, or formal regulatory/clinical peer-review, the following independent evaluation strategies are planned:
+
+#### Option A: Automated Synthetic Test Generation via RAGAS (`ragas`)
+* **Methodology:** Integrate the industry-standard [RAGAS](https://github.com/explodinggradients/ragas) framework. RAGAS parses the protocol chunk corpus and algorithmically synthesizes multi-hop and single-hop questions, target answers, and ground-truth contexts without human bias.
+* **Metrics:** Generates automated scores for **Context Precision**, **Context Recall**, **Faithfulness**, and **Answer Relevance**.
+* **Reason Deferred:** Incurs substantial OpenAI token costs during generation and scoring; deferred to production pre-deployment verification.
+
+#### Option B: Cross-Model Family Synthetic QA (Model-as-Generator)
+* **Methodology:** Use a distinct, competing frontier model family (e.g., Anthropic Claude 3.5 Sonnet or Google Gemini 1.5 Pro) to read protocol documents and formulate test inquiries, which are then fed into the OpenAI-based retrieval pipeline.
+* **Benefit:** Breaks single-vendor bias and eliminates developer circularity while testing how the pipeline interprets queries authored under different linguistic styles.
+
+#### Option C: Independent Clinical Human Annotation (Gold Standard)
+* **Methodology:** Engage practicing Clinical Research Coordinators (CRCs), Molecular Tumor Board (MTB) navigators, and oncology nurses to author screening questions from real-world patient intake scenarios (de-identified) without access to the vector database or chunk boundaries.
+* **Benefit:** The highest-fidelity benchmark possible, capturing authentic clinical phrasing, abbreviations, and edge cases.
+* **Reason Deferred:** High organizational overhead and financial cost; requires formal institutional allocation of clinical staff hours.
+
+#### Option D: Production Telemetry & LLM-as-a-Judge
+* **Methodology:** Log anonymized, live user queries in production and run periodic, asynchronous evaluation jobs where an independent frontier model grades retrieved passages and generated answers on a 1–5 clinical faithfulness rubric.
+

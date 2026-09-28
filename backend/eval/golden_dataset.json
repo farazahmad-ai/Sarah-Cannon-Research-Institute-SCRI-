@@ -1,0 +1,227 @@
+[
+  {
+    "id": "NSCLC-01",
+    "category": "non_small_cell_lung_cancer",
+    "query": "What are the prior therapy requirements for NCT07659782?",
+    "target_nct_id": "NCT07659782",
+    "expected_section": "Eligibility: Inclusion Criterion #6",
+    "target_keywords": ["platinum-based", "immune checkpoint inhibitor", "progression"],
+    "expected_refusal": false
+  },
+  {
+    "id": "NSCLC-02",
+    "category": "non_small_cell_lung_cancer",
+    "query": "What is the washout requirement for major surgery in NCT07659782?",
+    "target_nct_id": "NCT07659782",
+    "expected_section": "Eligibility: Exclusion Criterion #3",
+    "target_keywords": ["major surgery", "4 weeks"],
+    "expected_refusal": false
+  },
+  {
+    "id": "NSCLC-03",
+    "category": "non_small_cell_lung_cancer",
+    "query": "What is the radiation therapy washout period for NCT07659782?",
+    "target_nct_id": "NCT07659782",
+    "expected_section": "Eligibility: Exclusion Criterion #4",
+    "target_keywords": ["radiation therapy", "1 week"],
+    "expected_refusal": false
+  },
+  {
+    "id": "NSCLC-04",
+    "category": "non_small_cell_lung_cancer",
+    "query": "Does NCT07659782 allow patients with brain metastases?",
+    "target_nct_id": "NCT07659782",
+    "expected_section": "Eligibility: Inclusion Criterion #10",
+    "target_keywords": ["asymptomatic", "untreated brain metastases"],
+    "expected_refusal": false
+  },
+  {
+    "id": "NSCLC-05",
+    "category": "non_small_cell_lung_cancer",
+    "query": "Are patients with prior systemic therapy eligible for NCT06498635?",
+    "target_nct_id": "NCT06498635",
+    "expected_section": "Eligibility: Inclusion Criterion #8",
+    "target_keywords": ["must not have received any prior systemic therapy", "chemotherapy", "immunotherapy"],
+    "expected_refusal": false
+  },
+  {
+    "id": "LYMPH-01",
+    "category": "lymphoma_car_t",
+    "query": "Does NCT07519772 exclude patients with active central nervous system CNS lymphoma?",
+    "target_nct_id": "NCT07519772",
+    "expected_section": "Eligibility: Exclusion Criterion #10",
+    "target_keywords": ["active CNS lymphoma", "involvement"],
+    "expected_refusal": false
+  },
+  {
+    "id": "LYMPH-02",
+    "category": "lymphoma_car_t",
+    "query": "What are the autoimmune disease exclusion criteria for NCT07519772?",
+    "target_nct_id": "NCT07519772",
+    "expected_section": "Eligibility: Exclusion Criterion #11",
+    "target_keywords": ["active autoimmune disease", "2 years"],
+    "expected_refusal": false
+  },
+  {
+    "id": "LYMPH-03",
+    "category": "lymphoma_car_t",
+    "query": "Can patients with prior treatment for DLBCL enroll in NCT06717347?",
+    "target_nct_id": "NCT06717347",
+    "expected_section": "Eligibility: Inclusion Criterion #3",
+    "target_keywords": ["received no prior treatment", "DLBCL"],
+    "expected_refusal": false
+  },
+  {
+    "id": "LYMPH-04",
+    "category": "lymphoma_car_t",
+    "query": "Does NCT07519772 exclude patients with ongoing surgical complications or unrecovered surgery?",
+    "target_nct_id": "NCT07519772",
+    "expected_section": "Eligibility: Exclusion Criterion #14",
+    "target_keywords": ["not recovered from major surgery", "surgical complications"],
+    "expected_refusal": false
+  },
+  {
+    "id": "LYMPH-05",
+    "category": "lymphoma_car_t",
+    "query": "What are the active infection exclusion criteria for NCT07519772?",
+    "target_nct_id": "NCT07519772",
+    "expected_section": "Eligibility: Exclusion Criterion #12",
+    "target_keywords": ["active infection", "systemic therapy"],
+    "expected_refusal": false
+  },
+  {
+    "id": "CRC-01",
+    "category": "colorectal_cancer",
+    "query": "What is the prior therapy washout for metastatic colorectal cancer in NCT06529523?",
+    "target_nct_id": "NCT06529523",
+    "expected_section": "Eligibility: Exclusion Criterion #19",
+    "target_keywords": ["adjuvant", "6 months"],
+    "expected_refusal": false
+  },
+  {
+    "id": "CRC-02",
+    "category": "colorectal_cancer",
+    "query": "Does NCT06529523 exclude prior radiation or chemotherapy for localized rectal cancer?",
+    "target_nct_id": "NCT06529523",
+    "expected_section": "Eligibility: Exclusion Criterion #22",
+    "target_keywords": ["localized rectal cancer", "prior immunotherapy"],
+    "expected_refusal": false
+  },
+  {
+    "id": "CRC-03",
+    "category": "colorectal_cancer",
+    "query": "What are the brain metastases eligibility requirements for colorectal trial NCT06529523?",
+    "target_nct_id": "NCT06529523",
+    "expected_section": "Eligibility: Exclusion Criterion #20",
+    "target_keywords": ["brain metastases", "central nervous system"],
+    "expected_refusal": false
+  },
+  {
+    "id": "CRC-04",
+    "category": "colorectal_cancer",
+    "query": "What are the histological requirements for inclusion in NCT06529523?",
+    "target_nct_id": "NCT06529523",
+    "expected_section": "Eligibility: Inclusion Criterion #1",
+    "target_keywords": ["colorectal adenocarcinoma", "metastatic", "histologically"],
+    "expected_refusal": false
+  },
+  {
+    "id": "BREAST-01",
+    "category": "breast_cancer",
+    "query": "What is the washout for prior investigational agents or devices in NCT06393374?",
+    "target_nct_id": "NCT06393374",
+    "expected_section": "Eligibility: Exclusion Criterion #13",
+    "target_keywords": ["investigational agent", "4 weeks"],
+    "expected_refusal": false
+  },
+  {
+    "id": "BREAST-02",
+    "category": "breast_cancer",
+    "query": "Are pregnant or breastfeeding women excluded in breast cancer trial NCT07297667?",
+    "target_nct_id": "NCT07297667",
+    "expected_section": "Eligibility: Exclusion Criterion #17",
+    "target_keywords": ["pregnant", "breastfeeding"],
+    "expected_refusal": false
+  },
+  {
+    "id": "BREAST-03",
+    "category": "breast_cancer",
+    "query": "Does NCT07297667 exclude participants with active tuberculosis?",
+    "target_nct_id": "NCT07297667",
+    "expected_section": "Eligibility: Exclusion Criterion #11",
+    "target_keywords": ["tuberculosis"],
+    "expected_refusal": false
+  },
+  {
+    "id": "BREAST-04",
+    "category": "breast_cancer",
+    "query": "What is the minimum age requirement for consent in NCT07340541?",
+    "target_nct_id": "NCT07340541",
+    "expected_section": "Eligibility: Inclusion Criterion #3",
+    "target_keywords": ["18 years", "consent"],
+    "expected_refusal": false
+  },
+  {
+    "id": "MEL-01",
+    "category": "melanoma",
+    "query": "What is the radiotherapy washout requirement for melanoma trial NCT06906822?",
+    "target_nct_id": "NCT06906822",
+    "expected_section": "Eligibility: Exclusion Criterion #4",
+    "target_keywords": ["prior radiotherapy", "2 weeks"],
+    "expected_refusal": false
+  },
+  {
+    "id": "MEL-02",
+    "category": "melanoma",
+    "query": "Does NCT06906822 exclude patients with active infections requiring systemic therapy?",
+    "target_nct_id": "NCT06906822",
+    "expected_section": "Eligibility: Exclusion Criterion #16",
+    "target_keywords": ["active infection", "systemic therapy"],
+    "expected_refusal": false
+  },
+  {
+    "id": "MEL-03",
+    "category": "melanoma",
+    "query": "Does NCT05136196 exclude participants with malabsorption syndrome?",
+    "target_nct_id": "NCT05136196",
+    "expected_section": "Eligibility: Inclusion Criterion #18",
+    "target_keywords": ["malabsorption syndrome"],
+    "expected_refusal": false
+  },
+  {
+    "id": "MEL-04",
+    "category": "melanoma",
+    "query": "Does NCT06172478 exclude patients with mucosal or uveal melanoma?",
+    "target_nct_id": "NCT06172478",
+    "expected_section": "Eligibility: Exclusion Criterion #4",
+    "target_keywords": ["mucosal or uveal melanoma"],
+    "expected_refusal": false
+  },
+  {
+    "id": "NEG-01",
+    "category": "negative_control",
+    "query": "What are the inclusion criteria for pediatric glioblastoma multiforme brain tumor protocols?",
+    "target_nct_id": null,
+    "expected_section": null,
+    "target_keywords": [],
+    "expected_refusal": true
+  },
+  {
+    "id": "NEG-02",
+    "category": "negative_control",
+    "query": "What are the eligibility criteria for NCT05794958 regarding brain metastases?",
+    "target_nct_id": "NCT05794958",
+    "expected_section": null,
+    "target_keywords": [],
+    "expected_refusal": true
+  },
+  {
+    "id": "NEG-03",
+    "category": "negative_control",
+    "query": "What are the cognitive threshold requirements for Alzheimer's clinical trials?",
+    "target_nct_id": null,
+    "expected_section": null,
+    "target_keywords": [],
+    "expected_refusal": true
+  }
+]

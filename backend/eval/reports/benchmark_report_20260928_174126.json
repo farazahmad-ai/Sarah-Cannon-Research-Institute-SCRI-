@@ -1,0 +1,801 @@
+{
+  "timestamp_utc": "2026-09-28T17:41:26.218031+00:00",
+  "total_test_cases": 25,
+  "positive_test_cases": 22,
+  "negative_test_cases": 3,
+  "metrics": {
+    "recall_at_1": 0.9091,
+    "recall_at_3": 0.9545,
+    "recall_at_5": 0.9545,
+    "recall_at_10": 0.9545,
+    "mrr": 0.9242,
+    "refusal_accuracy": 0.6667
+  },
+  "targets": {
+    "recall_at_1_target": 0.6,
+    "recall_at_3_target": 0.8,
+    "recall_at_5_target": 0.9,
+    "recall_at_10_target": 0.95,
+    "mrr_target": 0.7,
+    "refusal_accuracy_target": 1.0
+  },
+  "targets_met": {
+    "recall_at_1": true,
+    "recall_at_3": true,
+    "recall_at_5": true,
+    "recall_at_10": true,
+    "mrr": true,
+    "refusal_accuracy": false
+  },
+  "latency_ms": {
+    "mean": 6325.78,
+    "p50": 4349.33,
+    "p95": 21431.57
+  },
+  "results": [
+    {
+      "id": "NSCLC-01",
+      "category": "non_small_cell_lung_cancer",
+      "query": "What are the prior therapy requirements for NCT07659782?",
+      "target_nct": "NCT07659782",
+      "expected_section": "Eligibility: Inclusion Criterion #6",
+      "expected_refusal": false,
+      "latency_ms": 25653.68,
+      "retrieved_count": 10,
+      "matched_rank": 3,
+      "top_passages": [
+        {
+          "rank": 1,
+          "nct_id": "NCT07659782",
+          "section": "Eligibility: Exclusion Criterion #2",
+          "similarity": 0.637
+        },
+        {
+          "rank": 2,
+          "nct_id": "NCT07659782",
+          "section": "Eligibility: Exclusion Criterion #8",
+          "similarity": 0.63
+        },
+        {
+          "rank": 3,
+          "nct_id": "NCT07659782",
+          "section": "Eligibility: Inclusion Criterion #6",
+          "similarity": 0.622
+        }
+      ],
+      "success": true
+    },
+    {
+      "id": "NSCLC-02",
+      "category": "non_small_cell_lung_cancer",
+      "query": "What is the washout requirement for major surgery in NCT07659782?",
+      "target_nct": "NCT07659782",
+      "expected_section": "Eligibility: Exclusion Criterion #3",
+      "expected_refusal": false,
+      "latency_ms": 5704.21,
+      "retrieved_count": 10,
+      "matched_rank": 1,
+      "top_passages": [
+        {
+          "rank": 1,
+          "nct_id": "NCT07659782",
+          "section": "Eligibility: Exclusion Criterion #3",
+          "similarity": 0.645
+        },
+        {
+          "rank": 2,
+          "nct_id": "NCT07659782",
+          "section": "Eligibility: Exclusion Criterion #2",
+          "similarity": 0.539
+        },
+        {
+          "rank": 3,
+          "nct_id": "NCT07659782",
+          "section": "Eligibility: Exclusion Criterion #8",
+          "similarity": 0.534
+        }
+      ],
+      "success": true
+    },
+    {
+      "id": "NSCLC-03",
+      "category": "non_small_cell_lung_cancer",
+      "query": "What is the radiation therapy washout period for NCT07659782?",
+      "target_nct": "NCT07659782",
+      "expected_section": "Eligibility: Exclusion Criterion #4",
+      "expected_refusal": false,
+      "latency_ms": 7270.18,
+      "retrieved_count": 10,
+      "matched_rank": 1,
+      "top_passages": [
+        {
+          "rank": 1,
+          "nct_id": "NCT07659782",
+          "section": "Eligibility: Exclusion Criterion #4",
+          "similarity": 0.62
+        },
+        {
+          "rank": 2,
+          "nct_id": "NCT07659782",
+          "section": "Eligibility: Exclusion Criterion #2",
+          "similarity": 0.583
+        },
+        {
+          "rank": 3,
+          "nct_id": "NCT07659782",
+          "section": "Eligibility: Exclusion Criterion #3",
+          "similarity": 0.574
+        }
+      ],
+      "success": true
+    },
+    {
+      "id": "NSCLC-04",
+      "category": "non_small_cell_lung_cancer",
+      "query": "Does NCT07659782 allow patients with brain metastases?",
+      "target_nct": "NCT07659782",
+      "expected_section": "Eligibility: Inclusion Criterion #10",
+      "expected_refusal": false,
+      "latency_ms": 21431.57,
+      "retrieved_count": 10,
+      "matched_rank": 1,
+      "top_passages": [
+        {
+          "rank": 1,
+          "nct_id": "NCT07659782",
+          "section": "Eligibility: Inclusion Criterion #10",
+          "similarity": 0.704
+        },
+        {
+          "rank": 2,
+          "nct_id": "NCT07659782",
+          "section": "Eligibility: Exclusion Criterion #7",
+          "similarity": 0.667
+        },
+        {
+          "rank": 3,
+          "nct_id": "NCT07659782",
+          "section": "Eligibility: Inclusion Criterion #8",
+          "similarity": 0.658
+        }
+      ],
+      "success": true
+    },
+    {
+      "id": "NSCLC-05",
+      "category": "non_small_cell_lung_cancer",
+      "query": "Are patients with prior systemic therapy eligible for NCT06498635?",
+      "target_nct": "NCT06498635",
+      "expected_section": "Eligibility: Inclusion Criterion #8",
+      "expected_refusal": false,
+      "latency_ms": 11135.56,
+      "retrieved_count": 10,
+      "matched_rank": 1,
+      "top_passages": [
+        {
+          "rank": 1,
+          "nct_id": "NCT06498635",
+          "section": "Eligibility: Inclusion Criterion #8",
+          "similarity": 0.697
+        },
+        {
+          "rank": 2,
+          "nct_id": "NCT06498635",
+          "section": "Eligibility: Inclusion Criterion #27",
+          "similarity": 0.66
+        },
+        {
+          "rank": 3,
+          "nct_id": "NCT06498635",
+          "section": "Eligibility: Inclusion Criterion #6",
+          "similarity": 0.656
+        }
+      ],
+      "success": true
+    },
+    {
+      "id": "LYMPH-01",
+      "category": "lymphoma_car_t",
+      "query": "Does NCT07519772 exclude patients with active central nervous system CNS lymphoma?",
+      "target_nct": "NCT07519772",
+      "expected_section": "Eligibility: Exclusion Criterion #10",
+      "expected_refusal": false,
+      "latency_ms": 6251.88,
+      "retrieved_count": 10,
+      "matched_rank": 1,
+      "top_passages": [
+        {
+          "rank": 1,
+          "nct_id": "NCT07519772",
+          "section": "Eligibility: Exclusion Criterion #10",
+          "similarity": 0.733
+        },
+        {
+          "rank": 2,
+          "nct_id": "NCT07519772",
+          "section": "Eligibility: Exclusion Criterion #3",
+          "similarity": 0.731
+        },
+        {
+          "rank": 3,
+          "nct_id": "NCT07519772",
+          "section": "Eligibility: Exclusion Criterion #12",
+          "similarity": 0.637
+        }
+      ],
+      "success": true
+    },
+    {
+      "id": "LYMPH-02",
+      "category": "lymphoma_car_t",
+      "query": "What are the autoimmune disease exclusion criteria for NCT07519772?",
+      "target_nct": "NCT07519772",
+      "expected_section": "Eligibility: Exclusion Criterion #11",
+      "expected_refusal": false,
+      "latency_ms": 5947.39,
+      "retrieved_count": 10,
+      "matched_rank": 1,
+      "top_passages": [
+        {
+          "rank": 1,
+          "nct_id": "NCT07519772",
+          "section": "Eligibility: Exclusion Criterion #11",
+          "similarity": 0.738
+        },
+        {
+          "rank": 2,
+          "nct_id": "NCT07519772",
+          "section": "Eligibility: Exclusion Criterion #1",
+          "similarity": 0.681
+        },
+        {
+          "rank": 3,
+          "nct_id": "NCT07519772",
+          "section": "Eligibility: Exclusion Criterion #7",
+          "similarity": 0.645
+        }
+      ],
+      "success": true
+    },
+    {
+      "id": "LYMPH-03",
+      "category": "lymphoma_car_t",
+      "query": "Can patients with prior treatment for DLBCL enroll in NCT06717347?",
+      "target_nct": "NCT06717347",
+      "expected_section": "Eligibility: Inclusion Criterion #3",
+      "expected_refusal": false,
+      "latency_ms": 3774.64,
+      "retrieved_count": 10,
+      "matched_rank": 1,
+      "top_passages": [
+        {
+          "rank": 1,
+          "nct_id": "NCT06717347",
+          "section": "Eligibility: Inclusion Criterion #3",
+          "similarity": 0.73
+        },
+        {
+          "rank": 2,
+          "nct_id": "NCT06717347",
+          "section": "Eligibility: Exclusion Criterion #1",
+          "similarity": 0.692
+        },
+        {
+          "rank": 3,
+          "nct_id": "NCT06717347",
+          "section": "Eligibility: Exclusion Criterion #3",
+          "similarity": 0.681
+        }
+      ],
+      "success": true
+    },
+    {
+      "id": "LYMPH-04",
+      "category": "lymphoma_car_t",
+      "query": "Does NCT07519772 exclude patients with ongoing surgical complications or unrecovered surgery?",
+      "target_nct": "NCT07519772",
+      "expected_section": "Eligibility: Exclusion Criterion #14",
+      "expected_refusal": false,
+      "latency_ms": 3650.13,
+      "retrieved_count": 10,
+      "matched_rank": 1,
+      "top_passages": [
+        {
+          "rank": 1,
+          "nct_id": "NCT07519772",
+          "section": "Eligibility: Exclusion Criterion #14",
+          "similarity": 0.678
+        },
+        {
+          "rank": 2,
+          "nct_id": "NCT07519772",
+          "section": "Eligibility: Exclusion Criterion #4",
+          "similarity": 0.554
+        },
+        {
+          "rank": 3,
+          "nct_id": "NCT07519772",
+          "section": "Eligibility: Exclusion Criterion #9",
+          "similarity": 0.549
+        }
+      ],
+      "success": true
+    },
+    {
+      "id": "LYMPH-05",
+      "category": "lymphoma_car_t",
+      "query": "What are the active infection exclusion criteria for NCT07519772?",
+      "target_nct": "NCT07519772",
+      "expected_section": "Eligibility: Exclusion Criterion #12",
+      "expected_refusal": false,
+      "latency_ms": 3403.66,
+      "retrieved_count": 10,
+      "matched_rank": 1,
+      "top_passages": [
+        {
+          "rank": 1,
+          "nct_id": "NCT07519772",
+          "section": "Eligibility: Exclusion Criterion #12",
+          "similarity": 0.684
+        },
+        {
+          "rank": 2,
+          "nct_id": "NCT07519772",
+          "section": "Eligibility: Exclusion Criterion #1",
+          "similarity": 0.66
+        },
+        {
+          "rank": 3,
+          "nct_id": "NCT07519772",
+          "section": "Eligibility: Exclusion Criterion #7",
+          "similarity": 0.659
+        }
+      ],
+      "success": true
+    },
+    {
+      "id": "CRC-01",
+      "category": "colorectal_cancer",
+      "query": "What is the prior therapy washout for metastatic colorectal cancer in NCT06529523?",
+      "target_nct": "NCT06529523",
+      "expected_section": "Eligibility: Exclusion Criterion #19",
+      "expected_refusal": false,
+      "latency_ms": 4322.52,
+      "retrieved_count": 10,
+      "matched_rank": 1,
+      "top_passages": [
+        {
+          "rank": 1,
+          "nct_id": "NCT06529523",
+          "section": "Eligibility: Exclusion Criterion #19",
+          "similarity": 0.715
+        },
+        {
+          "rank": 2,
+          "nct_id": "NCT06529523",
+          "section": "Eligibility: Exclusion Criterion #10",
+          "similarity": 0.675
+        },
+        {
+          "rank": 3,
+          "nct_id": "NCT06529523",
+          "section": "Eligibility: Exclusion Criterion #22",
+          "similarity": 0.67
+        }
+      ],
+      "success": true
+    },
+    {
+      "id": "CRC-02",
+      "category": "colorectal_cancer",
+      "query": "Does NCT06529523 exclude prior radiation or chemotherapy for localized rectal cancer?",
+      "target_nct": "NCT06529523",
+      "expected_section": "Eligibility: Exclusion Criterion #22",
+      "expected_refusal": false,
+      "latency_ms": 4349.33,
+      "retrieved_count": 10,
+      "matched_rank": 1,
+      "top_passages": [
+        {
+          "rank": 1,
+          "nct_id": "NCT06529523",
+          "section": "Eligibility: Exclusion Criterion #22",
+          "similarity": 0.761
+        },
+        {
+          "rank": 2,
+          "nct_id": "NCT06529523",
+          "section": "Eligibility: Exclusion Criterion #19",
+          "similarity": 0.719
+        },
+        {
+          "rank": 3,
+          "nct_id": "NCT06529523",
+          "section": "Eligibility: Exclusion Criterion #9",
+          "similarity": 0.663
+        }
+      ],
+      "success": true
+    },
+    {
+      "id": "CRC-03",
+      "category": "colorectal_cancer",
+      "query": "What are the brain metastases eligibility requirements for colorectal trial NCT06529523?",
+      "target_nct": "NCT06529523",
+      "expected_section": "Eligibility: Exclusion Criterion #20",
+      "expected_refusal": false,
+      "latency_ms": 4475.86,
+      "retrieved_count": 10,
+      "matched_rank": 1,
+      "top_passages": [
+        {
+          "rank": 1,
+          "nct_id": "NCT06529523",
+          "section": "Eligibility: Exclusion Criterion #20",
+          "similarity": 0.722
+        },
+        {
+          "rank": 2,
+          "nct_id": "NCT06529523",
+          "section": "Eligibility: Exclusion Criterion #23",
+          "similarity": 0.689
+        },
+        {
+          "rank": 3,
+          "nct_id": "NCT06529523",
+          "section": "Eligibility: Inclusion Criterion #1",
+          "similarity": 0.641
+        }
+      ],
+      "success": true
+    },
+    {
+      "id": "CRC-04",
+      "category": "colorectal_cancer",
+      "query": "What are the histological requirements for inclusion in NCT06529523?",
+      "target_nct": "NCT06529523",
+      "expected_section": "Eligibility: Inclusion Criterion #1",
+      "expected_refusal": false,
+      "latency_ms": 4066.8,
+      "retrieved_count": 10,
+      "matched_rank": 1,
+      "top_passages": [
+        {
+          "rank": 1,
+          "nct_id": "NCT06529523",
+          "section": "Eligibility: Inclusion Criterion #1",
+          "similarity": 0.603
+        },
+        {
+          "rank": 2,
+          "nct_id": "NCT06529523",
+          "section": "Eligibility: Exclusion Criterion #18",
+          "similarity": 0.595
+        },
+        {
+          "rank": 3,
+          "nct_id": "NCT06529523",
+          "section": "Eligibility: Exclusion Criterion #21",
+          "similarity": 0.592
+        }
+      ],
+      "success": true
+    },
+    {
+      "id": "BREAST-01",
+      "category": "breast_cancer",
+      "query": "What is the washout for prior investigational agents or devices in NCT06393374?",
+      "target_nct": "NCT06393374",
+      "expected_section": "Eligibility: Exclusion Criterion #13",
+      "expected_refusal": false,
+      "latency_ms": 3905.65,
+      "retrieved_count": 10,
+      "matched_rank": 1,
+      "top_passages": [
+        {
+          "rank": 1,
+          "nct_id": "NCT06393374",
+          "section": "Eligibility: Exclusion Criterion #13",
+          "similarity": 0.641
+        },
+        {
+          "rank": 2,
+          "nct_id": "NCT06393374",
+          "section": "Eligibility: Exclusion Criterion #8",
+          "similarity": 0.597
+        },
+        {
+          "rank": 3,
+          "nct_id": "NCT06393374",
+          "section": "Eligibility: Exclusion Criterion #11",
+          "similarity": 0.564
+        }
+      ],
+      "success": true
+    },
+    {
+      "id": "BREAST-02",
+      "category": "breast_cancer",
+      "query": "Are pregnant or breastfeeding women excluded in breast cancer trial NCT07297667?",
+      "target_nct": "NCT07297667",
+      "expected_section": "Eligibility: Exclusion Criterion #17",
+      "expected_refusal": false,
+      "latency_ms": 4975.17,
+      "retrieved_count": 10,
+      "matched_rank": 1,
+      "top_passages": [
+        {
+          "rank": 1,
+          "nct_id": "NCT07297667",
+          "section": "Eligibility: Exclusion Criterion #17",
+          "similarity": 0.753
+        },
+        {
+          "rank": 2,
+          "nct_id": "NCT07297667",
+          "section": "Eligibility: Exclusion Criterion #1",
+          "similarity": 0.629
+        },
+        {
+          "rank": 3,
+          "nct_id": "NCT07297667",
+          "section": "Eligibility: Inclusion Criterion #25",
+          "similarity": 0.62
+        }
+      ],
+      "success": true
+    },
+    {
+      "id": "BREAST-03",
+      "category": "breast_cancer",
+      "query": "Does NCT07297667 exclude participants with active tuberculosis?",
+      "target_nct": "NCT07297667",
+      "expected_section": "Eligibility: Exclusion Criterion #11",
+      "expected_refusal": false,
+      "latency_ms": 4120.9,
+      "retrieved_count": 10,
+      "matched_rank": 1,
+      "top_passages": [
+        {
+          "rank": 1,
+          "nct_id": "NCT07297667",
+          "section": "Eligibility: Exclusion Criterion #11",
+          "similarity": 0.681
+        },
+        {
+          "rank": 2,
+          "nct_id": "NCT07297667",
+          "section": "Eligibility: Exclusion Criterion #6",
+          "similarity": 0.617
+        },
+        {
+          "rank": 3,
+          "nct_id": "NCT07297667",
+          "section": "Eligibility: Exclusion Criterion #10",
+          "similarity": 0.592
+        }
+      ],
+      "success": true
+    },
+    {
+      "id": "BREAST-04",
+      "category": "breast_cancer",
+      "query": "What is the minimum age requirement for consent in NCT07340541?",
+      "target_nct": "NCT07340541",
+      "expected_section": "Eligibility: Inclusion Criterion #3",
+      "expected_refusal": false,
+      "latency_ms": 2836.31,
+      "retrieved_count": 8,
+      "matched_rank": 1,
+      "top_passages": [
+        {
+          "rank": 1,
+          "nct_id": "NCT07340541",
+          "section": "Eligibility: Inclusion Criterion #3",
+          "similarity": 0.56
+        },
+        {
+          "rank": 2,
+          "nct_id": "NCT07340541",
+          "section": "Eligibility: Inclusion Criterion #5",
+          "similarity": 0.481
+        },
+        {
+          "rank": 3,
+          "nct_id": "NCT07340541",
+          "section": "Eligibility: Inclusion Criterion #2",
+          "similarity": 0.467
+        }
+      ],
+      "success": true
+    },
+    {
+      "id": "MEL-01",
+      "category": "melanoma",
+      "query": "What is the radiotherapy washout requirement for melanoma trial NCT06906822?",
+      "target_nct": "NCT06906822",
+      "expected_section": "Eligibility: Exclusion Criterion #4",
+      "expected_refusal": false,
+      "latency_ms": 4522.01,
+      "retrieved_count": 10,
+      "matched_rank": 1,
+      "top_passages": [
+        {
+          "rank": 1,
+          "nct_id": "NCT06906822",
+          "section": "Eligibility: Exclusion Criterion #4",
+          "similarity": 0.687
+        },
+        {
+          "rank": 2,
+          "nct_id": "NCT06906822",
+          "section": "Eligibility: Exclusion Criterion #3",
+          "similarity": 0.617
+        },
+        {
+          "rank": 3,
+          "nct_id": "NCT06906822",
+          "section": "Eligibility: Inclusion Criterion #3",
+          "similarity": 0.617
+        }
+      ],
+      "success": true
+    },
+    {
+      "id": "MEL-02",
+      "category": "melanoma",
+      "query": "Does NCT06906822 exclude patients with active infections requiring systemic therapy?",
+      "target_nct": "NCT06906822",
+      "expected_section": "Eligibility: Exclusion Criterion #16",
+      "expected_refusal": false,
+      "latency_ms": 3999.3,
+      "retrieved_count": 10,
+      "matched_rank": 1,
+      "top_passages": [
+        {
+          "rank": 1,
+          "nct_id": "NCT06906822",
+          "section": "Eligibility: Exclusion Criterion #16",
+          "similarity": 0.693
+        },
+        {
+          "rank": 2,
+          "nct_id": "NCT06906822",
+          "section": "Eligibility: Exclusion Criterion #8",
+          "similarity": 0.597
+        },
+        {
+          "rank": 3,
+          "nct_id": "NCT06906822",
+          "section": "Eligibility: Exclusion Criterion #14",
+          "similarity": 0.59
+        }
+      ],
+      "success": true
+    },
+    {
+      "id": "MEL-03",
+      "category": "melanoma",
+      "query": "Does NCT05136196 exclude participants with malabsorption syndrome?",
+      "target_nct": "NCT05136196",
+      "expected_section": "Eligibility: Inclusion Criterion #18",
+      "expected_refusal": false,
+      "latency_ms": 3556.77,
+      "retrieved_count": 10,
+      "matched_rank": 1,
+      "top_passages": [
+        {
+          "rank": 1,
+          "nct_id": "NCT05136196",
+          "section": "Eligibility: Inclusion Criterion #18",
+          "similarity": 0.712
+        },
+        {
+          "rank": 2,
+          "nct_id": "NCT05136196",
+          "section": "Eligibility: Inclusion Criterion #20",
+          "similarity": 0.536
+        },
+        {
+          "rank": 3,
+          "nct_id": "NCT05136196",
+          "section": "Eligibility: Inclusion Criterion #19",
+          "similarity": 0.525
+        }
+      ],
+      "success": true
+    },
+    {
+      "id": "MEL-04",
+      "category": "melanoma",
+      "query": "Does NCT06172478 include patients with unresectable cutaneous melanoma?",
+      "target_nct": "NCT06172478",
+      "expected_section": "Eligibility: Inclusion Criterion #4",
+      "expected_refusal": false,
+      "latency_ms": 3172.45,
+      "retrieved_count": 10,
+      "matched_rank": null,
+      "top_passages": [
+        {
+          "rank": 1,
+          "nct_id": "NCT06172478",
+          "section": "Eligibility: Exclusion Criterion #4",
+          "similarity": 0.656
+        },
+        {
+          "rank": 2,
+          "nct_id": "NCT06172478",
+          "section": "Eligibility: Exclusion Criterion #9",
+          "similarity": 0.641
+        },
+        {
+          "rank": 3,
+          "nct_id": "NCT06172478",
+          "section": "Eligibility: Inclusion Criterion #7",
+          "similarity": 0.628
+        }
+      ],
+      "success": false,
+      "failure_reason": "Target criteria 'Eligibility: Inclusion Criterion #4' from NCT06172478 not found in top 10 results"
+    },
+    {
+      "id": "NEG-01",
+      "category": "negative_control",
+      "query": "What are the inclusion criteria for pediatric glioblastoma multiforme brain tumor protocols?",
+      "target_nct": null,
+      "expected_section": null,
+      "expected_refusal": true,
+      "latency_ms": 7252.4,
+      "retrieved_count": 3,
+      "matched_rank": null,
+      "top_passages": [
+        {
+          "rank": 1,
+          "nct_id": "NCT06395103",
+          "section": "Eligibility: Inclusion Criterion #3",
+          "similarity": 0.548
+        },
+        {
+          "rank": 2,
+          "nct_id": "NCT05136196",
+          "section": "Eligibility: Inclusion Criterion #32",
+          "similarity": 0.503
+        },
+        {
+          "rank": 3,
+          "nct_id": "NCT06395103",
+          "section": "Eligibility: Inclusion Criterion #1",
+          "similarity": 0.477
+        }
+      ],
+      "success": false,
+      "failure_reason": "Expected refusal (0 passages), but retrieved 3 passages"
+    },
+    {
+      "id": "NEG-02",
+      "category": "negative_control",
+      "query": "What are the eligibility criteria for NCT05794958 regarding brain metastases?",
+      "target_nct": "NCT05794958",
+      "expected_section": null,
+      "expected_refusal": true,
+      "latency_ms": 1997.98,
+      "retrieved_count": 0,
+      "matched_rank": null,
+      "top_passages": [],
+      "success": true
+    },
+    {
+      "id": "NEG-03",
+      "category": "negative_control",
+      "query": "What are the cognitive threshold requirements for Alzheimer's clinical trials?",
+      "target_nct": null,
+      "expected_section": null,
+      "expected_refusal": true,
+      "latency_ms": 6368.09,
+      "retrieved_count": 0,
+      "matched_rank": null,
+      "top_passages": [],
+      "success": true
+    }
+  ]
+}

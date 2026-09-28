@@ -57,6 +57,9 @@ _GENERIC_QUERY_TERMS: frozenset[str] = frozenset({
     "limits", "threshold", "thresholds", "value", "values", "guideline",
     "guidelines", "prior", "following", "before", "after", "first", "least",
     "number",
+    # domain-wide clinical/oncology scaffolding (present across virtually all trials)
+    "clinical", "disease", "diseases", "tumor", "tumors", "tumour", "tumours",
+    "cancer", "cancers", "oncology", "condition", "conditions",
 })
 
 _ENTITY_TOKEN_RE = re.compile(r"[a-z0-9]+")
