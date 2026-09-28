@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import uuid
 from collections.abc import AsyncGenerator
 
@@ -17,7 +18,10 @@ from pydantic_ai.messages import (
 
 from app.assistant.agent import oncology_agent
 from app.assistant.deps import OncologyAgentDeps
-from app.assistant.prompts import build_no_evidence_refusal
+from app.assistant.prompts import (
+    build_no_evidence_refusal,
+    format_protocol_context,
+)
 from app.assistant.schemas import ChatRequest, ProtocolPassage
 from app.auth.jwt import AuthenticatedUser
 from app.database.chats import (
@@ -31,19 +35,89 @@ from app.database.models import ChatMessage
 from app.database.session import async_session_factory
 from app.database.trials import get_corpus_manifest
 from app.grounding.validator import GroundingValidator
-from app.retrieval.hybrid import DEFAULT_MIN_SIMILARITY, retrieve_protocols
+from app.retrieval.hybrid import (
+    DEFAULT_LIMIT,
+    DEFAULT_MIN_SIMILARITY,
+    retrieve_protocols,
+)
 
 logger = logging.getLogger(__name__)
 
+# Maximum number of queries allowed in a single screening thread to prevent context decay
+MAX_QUERIES_PER_SESSION: int = 3
+
 # Maximum number of prior turns to include in the prompt.
-# Bounded here rather than in the DB query so the DB always returns the full
-# history (useful for future analytics) while the LLM only sees a safe window.
-MAX_HISTORY_TURNS: int = 10
+# Set to 2 (1 previous Q&A pair) to provide pronoun context ("that same patient")
+# while preventing multi-turn essay bloat that causes lost-in-the-middle hallucinations.
+MAX_HISTORY_TURNS: int = 2
 
 # Soft token ceiling for prior conversation history passed to the LLM.
 # Calculated roughly as len(text) // 4. History is trimmed tail-first so the most
 # recent turns are preserved (D-5).
 MAX_HISTORY_TOKENS: int = 8_000
+
+NCT_PATTERN = re.compile(r"\bNCT\d{8}\b", re.IGNORECASE)
+
+
+def build_retrieval_query(message: str, history: list[ChatMessage]) -> str:
+    """Anchor follow-up retrieval queries to active clinical trials.
+
+    When a coordinator asks a follow-up question (e.g., 'What about prior steroid use
+    for that same patient?'), naive retrieval loses trial context because the NCT ID
+    was only cited in earlier turns.
+
+    If the current query does NOT explicitly specify an NCT ID, this function prepends
+    the active NCT ID(s) so hybrid retrieval (vector + FTS) searches within the same protocol.
+    Note: It intentionally does NOT prepend prior section headers (e.g. chemotherapy headers)
+    to prevent polluting queries about distinct criteria (e.g. surgery or radiation).
+    """
+    if not history or not message.strip():
+        return message
+
+    if NCT_PATTERN.search(message):
+        return message
+
+    target_ncts = extract_target_nct_ids(message, history)
+    if not target_ncts:
+        return message
+
+    anchor_str = " ".join(target_ncts[:2])
+    return f"{anchor_str} {message}"
+
+
+def extract_target_nct_ids(message: str, history: list[ChatMessage]) -> list[str]:
+    """Identify target clinical trial NCT IDs for the current turn.
+
+    1. If the user's message explicitly mentions one or more NCT IDs, those take precedence.
+    2. If the user's message does NOT mention an NCT ID, scan history backward for the
+       most recent assistant turn with verified citations to inherit active trials.
+    3. Fallback: scan recent message text backward for any mentioned NCT IDs.
+    4. Return a deduplicated list of uppercase NCT IDs (e.g. ['NCT07659782']).
+    """
+    explicit = NCT_PATTERN.findall(message)
+    if explicit:
+        return list(dict.fromkeys(n.upper() for n in explicit))
+
+    # Priority 1: Check verified citations from recent assistant messages
+    for m in reversed(history):
+        if m.role == "assistant" and getattr(m, "citations", None) and not _is_refusal_or_unverified(m):
+            anchors: list[str] = []
+            for c in m.citations:
+                nct = getattr(c, "nct_id", None) or (c.get("nct_id") if isinstance(c, dict) else None)
+                if nct and nct.upper() not in anchors:
+                    anchors.append(nct.upper())
+            if anchors:
+                return anchors
+
+    # Priority 2: Fallback to scanning message text backward
+    for m in reversed(history):
+        found = NCT_PATTERN.findall(m.content)
+        if found:
+            return list(dict.fromkeys(n.upper() for n in found))
+
+    return []
+
+
 
 
 def _is_refusal_or_unverified(msg: ChatMessage) -> bool:
@@ -153,12 +227,91 @@ async def stream_chat_turn(
         full_history = await list_messages(pre_session, thread_id, user_uuid)
         history = _trim_history(full_history)
 
-        # 4. Retrieve candidate protocol passages via hybrid retrieval
-        passages: list[ProtocolPassage] = await retrieve_protocols(
-            pre_session,
-            request.message,
-            min_similarity=DEFAULT_MIN_SIMILARITY,
-        )
+        # 3b. Session query cap: prevent context decay, token bloat, and attention loss
+        user_queries_count = sum(1 for m in full_history if m.role == "user")
+        if user_queries_count >= MAX_QUERIES_PER_SESSION:
+            logger.info(
+                "Session limit reached for thread %s (%d queries)",
+                thread_id,
+                user_queries_count,
+            )
+            session_limit_msg = (
+                "⚠️ **Screening Session Limit Reached (3/3 Queries)**\n\n"
+                "To guarantee strict protocol grounding, prevent token degradation, and ensure patient safety, "
+                "individual screening sessions are capped at 3 queries.\n\n"
+                "Please click **'New Chat'** in the sidebar to start a fresh screening session for your next inquiry."
+            )
+            yield f"0:{json.dumps(session_limit_msg)}\n"
+            yield 'd:{"finishReason":"stop"}\n'
+
+            try:
+                async with async_session_factory() as post_session:
+                    await persist_turn(
+                        post_session,
+                        thread_id,
+                        request.message,
+                        session_limit_msg,
+                        citations=[],
+                    )
+                    await post_session.commit()
+            except BaseException as exc:
+                logger.error("Failed to persist session limit turn for thread %s: %s", thread_id, exc)
+            return
+
+        # 4. Retrieve candidate protocol passages via targeted or partitioned hybrid retrieval
+        target_ncts = extract_target_nct_ids(request.message, full_history)
+        retrieval_query = build_retrieval_query(request.message, full_history)
+
+        passages: list[ProtocolPassage] = []
+        if len(target_ncts) == 1:
+            # Single-trial isolation: strictly scope retrieval to the active trial
+            # Prevents other trials from leaking unrelated criteria into the context
+            single_nct = target_ncts[0]
+            logger.info(
+                "Single-trial isolated retrieval for thread %s [trial=%s]: '%s'",
+                thread_id,
+                single_nct,
+                retrieval_query,
+            )
+            passages = await retrieve_protocols(
+                pre_session,
+                retrieval_query,
+                nct_id=single_nct,
+                limit=DEFAULT_LIMIT,
+                min_similarity=DEFAULT_MIN_SIMILARITY,
+            )
+        elif len(target_ncts) > 1:
+            # Multi-trial balanced retrieval: run partitioned sub-queries per trial
+            # Prevents Trial A from crowding out Trial B in shared candidate pools
+            quota_per_trial = max(4, DEFAULT_LIMIT // len(target_ncts))
+            logger.info(
+                "Multi-trial partitioned retrieval for thread %s [trials=%s, quota=%d]: '%s'",
+                thread_id,
+                target_ncts,
+                quota_per_trial,
+                request.message,
+            )
+            seen_chunk_ids: set[uuid.UUID] = set()
+            for nct in target_ncts[:3]:  # Cap at top 3 active trials to preserve context budget
+                trial_passages = await retrieve_protocols(
+                    pre_session,
+                    f"{nct} {request.message}",
+                    nct_id=nct,
+                    limit=quota_per_trial,
+                    min_similarity=DEFAULT_MIN_SIMILARITY,
+                )
+                for p in trial_passages:
+                    if p.chunk_id not in seen_chunk_ids:
+                        seen_chunk_ids.add(p.chunk_id)
+                        passages.append(p)
+        else:
+            # Global corpus retrieval: broad disease or exploratory query
+            passages = await retrieve_protocols(
+                pre_session,
+                request.message,
+                limit=DEFAULT_LIMIT,
+                min_similarity=DEFAULT_MIN_SIMILARITY,
+            )
 
         # 5. Corpus manifest so coverage questions are answerable and refusals
         #    can name the actual disease areas in the system (C3 / N3).
@@ -204,12 +357,19 @@ async def stream_chat_turn(
             )
         return
 
+    # Only inject corpus manifest if user is asking about overall catalog coverage
+    is_coverage_query = any(
+        k in request.message.lower()
+        for k in ("what trials", "which trials", "list trials", "what diseases", "coverage", "how many trials")
+    )
+    manifest_for_prompt = corpus_manifest if (is_coverage_query or not passages) else {}
+
     # 5. Build agent dependencies and message history
     deps = OncologyAgentDeps(
         user_id=user_uuid,
         thread_id=thread_id,
         retrieved_passages=passages,
-        corpus_manifest=corpus_manifest,
+        corpus_manifest=manifest_for_prompt,
     )
 
     model_history: list[ModelMessage] = []
@@ -256,8 +416,18 @@ async def stream_chat_turn(
     collected_text: list[str] = []
 
     try:
+        context_block = format_protocol_context(passages)
+        prompt_with_instructions = (
+            f"{context_block}\n\n"
+            f"User Question: {request.message}\n\n"
+            "[MANDATORY CITATION & NUMERICAL PRECISION INSTRUCTIONS:\n"
+            "1. Every single factual criterion, washout duration, or threshold must cite its exact supporting protocol passage using [NCT ID, Section Header] from the Protocol Context above.\n"
+            "2. Report NUMERICAL TIMEFRAMES EXACTLY as written in the passage (e.g., '1 week', '4 weeks', '14 days'). NEVER average, combine, round, or extrapolate numbers between different criteria.\n"
+            "3. If multiple criteria are asked about or retrieved (e.g., surgery and radiation), state each one separately under its own bullet point with its own individual citation matching the exact passage header.]"
+        )
+
         async with oncology_agent.run_stream(
-            request.message,
+            prompt_with_instructions,
             deps=deps,
             message_history=model_history,
         ) as result:

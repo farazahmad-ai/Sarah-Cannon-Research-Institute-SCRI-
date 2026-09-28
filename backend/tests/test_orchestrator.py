@@ -36,7 +36,7 @@ def test_trim_history_caps_at_max_turns():
     assert len(trimmed) == MAX_HISTORY_TURNS
     # Tail preservation: the last message must match the last message in input
     assert trimmed[-1].content == "Turn 24"
-    assert trimmed[0].content == "Turn 15"
+    assert trimmed[0].content == f"Turn {25 - MAX_HISTORY_TURNS}"
 
 
 def test_trim_history_token_budget_preserves_tail():

@@ -8,7 +8,6 @@ switch to Redis-backed counting.
 
 import time
 from collections import defaultdict
-
 from collections.abc import Callable
 
 from fastapi import HTTPException, status

@@ -44,7 +44,7 @@ def create_oncology_agent() -> Agent[OncologyAgentDeps, str]:
         system_prompt=SYSTEM_PROMPT,
     )
 
-    @agent.system_prompt
+    @agent.system_prompt(dynamic=True)
     async def add_protocol_context(ctx: RunContext[OncologyAgentDeps]) -> str:
         """Dynamically inject retrieved protocol passages into agent context.
 
@@ -52,11 +52,13 @@ def create_oncology_agent() -> Agent[OncologyAgentDeps, str]:
         this system actually covers and can refuse off-corpus topics instead of
         guessing (audit finding C3).
         """
-        return (
-            format_corpus_manifest(ctx.deps.corpus_manifest)
-            + "\n\n"
-            + format_protocol_context(ctx.deps.retrieved_passages)
-        )
+        parts: list[str] = []
+        if ctx.deps.corpus_manifest:
+            manifest_str = format_corpus_manifest(ctx.deps.corpus_manifest)
+            if manifest_str:
+                parts.append(manifest_str)
+        parts.append(format_protocol_context(ctx.deps.retrieved_passages))
+        return "\n\n".join(parts)
 
     return agent
 

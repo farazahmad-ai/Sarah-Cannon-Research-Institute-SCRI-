@@ -98,6 +98,8 @@ def _query_nct_ids(query: str) -> set[str]:
 def apply_entity_gate(
     query: str,
     passages: list[ProtocolPassage],
+    *,
+    nct_id: str | None = None,
 ) -> list[ProtocolPassage]:
     """Drop passages that share too few specific clinical terms with the question.
 
@@ -112,7 +114,9 @@ def apply_entity_gate(
     if not terms or not passages:
         return passages
 
-    pinned_trials = _query_nct_ids(query)
+    pinned_trials = set(_query_nct_ids(query))
+    if nct_id:
+        pinned_trials.add(nct_id.upper())
 
     # A single specific term only proves relevance if the question only had one.
     required = min(MIN_ENTITY_MATCHES, len(terms))
@@ -164,6 +168,7 @@ async def retrieve_protocols(
     query: str,
     *,
     disease_category: str | None = None,
+    nct_id: str | None = None,
     limit: int = DEFAULT_LIMIT,
     min_similarity: float | None = DEFAULT_MIN_SIMILARITY,
     preserve_top_lexical: int = 2,
@@ -181,6 +186,7 @@ async def retrieve_protocols(
             session,
             cleaned_query,
             disease_category=disease_category,
+            nct_id=nct_id,
             limit=VECTOR_TOP_K,
         )
     except Exception as exc:  # noqa: BLE001
@@ -193,6 +199,7 @@ async def retrieve_protocols(
             session,
             cleaned_query,
             disease_category=disease_category,
+            nct_id=nct_id,
             limit=FTS_TOP_K,
         )
     except Exception as exc:  # noqa: BLE001
@@ -230,6 +237,6 @@ async def retrieve_protocols(
     )
 
     # Step 5: Entity relevance gate (audit finding C3)
-    gated_passages = apply_entity_gate(cleaned_query, floored_passages)
+    gated_passages = apply_entity_gate(cleaned_query, floored_passages, nct_id=nct_id)
 
     return gated_passages[:limit]

@@ -57,7 +57,22 @@ SYSTEM_PROMPT = (
     "7. EXHAUSTIVE PROTOCOL REVIEW: Before composing your answer, scan ALL passages in the Protocol Context. "
     "For each passage that is relevant to the coordinator's question, extract and cite the applicable criteria. "
     "Do NOT stop after finding one matching trial — if 3 passages from 3 different trials discuss the topic, "
-    "all 3 must be cited. Completeness is a clinical safety requirement."
+    "all 3 must be cited. Completeness is a clinical safety requirement.\n"
+    "8. STRICT TRIAL ISOLATION: When multiple trials are present in the Protocol Context, you must NEVER mix, blend, "
+    "or cross-attribute criteria between different trials. A criterion stated for NCT A must NEVER be claimed as applying "
+    "to NCT B. When answering about a specific trial, ONLY use passages labeled with that trial's NCT ID. If the passages "
+    "for that trial do not state a criterion, declare protocol silence for that specific trial ('NCT X does not state [parameter]'), "
+    "even if another trial in the context does state it.\n"
+    "9. MULTI-TRIAL COMPARATIVE STRUCTURE: When a question compares or asks across 2 or more trials, organize your answer "
+    "with clear, distinct sections or headings per trial (e.g., '### NCT07659782', '### NCT06312137'). Under each trial heading, "
+    "state and cite that trial's specific criteria independently before providing any comparative summary. "
+    "Never combine multiple trials into a single ambiguous sentence.\n"
+    "10. VERBATIM NUMERICAL PRECISION: Washout durations, laboratory thresholds, and time windows must be reported EXACTLY "
+    "as stated in the passage text (e.g., '1 week', '4 weeks', '14 days'). NEVER average, combine, round, or extrapolate "
+    "numbers between different criteria.\n"
+    "11. INDIVIDUAL BRACKET CITATIONS: Each criterion must have its own distinct bracket citation matching the EXACT "
+    "passage header where that criterion appears (e.g. [NCT07659782, Eligibility: Exclusion Criterion #3]). "
+    "NEVER combine multiple numbers or headers into a single bracket, and NEVER reuse a citation from an earlier conversation turn."
 )
 
 # Directive injected into the system context when retrieval returns zero passages.
@@ -91,7 +106,7 @@ def format_corpus_manifest(category_counts: dict[str, int]) -> str:
     ("does this system have pediatric GBM protocols?") and is tempted to guess.
     """
     if not category_counts:
-        return "Corpus Manifest: no clinical trials are currently loaded in this system."
+        return ""
 
     total = sum(category_counts.values())
     lines = [f"Corpus Manifest: this system contains {total} clinical trial protocol(s):"]

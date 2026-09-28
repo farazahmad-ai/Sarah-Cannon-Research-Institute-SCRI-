@@ -4,12 +4,13 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
 
 ---
 
-## 🎯 Recommended Execution Strategy: **Prerequisites ➔ Data ➔ Backend ➔ Frontend ➔ Evaluation**
+## 🎯 Recommended Execution Strategy: **Prerequisites ➔ Data ➔ Backend ➔ Frontend ➔ Evaluation & Deployment ➔ High-Value RAG Enhancements**
 
 ### Why this sequence?
 1. **The Grounding Rule:** In clinical oncology RAG, the UI is an interactive presentation layer for retrieved evidence. Building the schema, section-aware chunker, and hybrid retrieval engine first allows verification against real clinical protocols before writing React code.
 2. **Deterministic Verification:** We can test that complex clinical queries (washouts, lab thresholds, biomarker criteria) return exact citable clauses using fast Python unit tests.
 3. **Zero Rework:** When connecting the frontend, the backend endpoints are already live, typed, and streaming real verbatim protocol citations.
+4. **Scoped Excellence:** Focus purely on AI/RAG intelligence (Recall@K, MRR, multi-turn context) rather than enterprise HIPAA plumbing.
 
 ---
 
@@ -524,4 +525,70 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
   - [ ] **7.5.4 Keep-Alive / Cold-Start Mitigation (Free Tier)**:
     - Set up an automated 10-minute HTTP ping on [cron-job.org](https://cron-job.org) or [uptimerobot.com](https://uptimerobot.com) targeting `https://scri-copilot-backend.onrender.com/health`
     - Keeps the 512 MB container awake during clinical screening hours, eliminating the 45-50s free tier spin-up delay
+
+---
+
+## Phase 8: High-Value RAG Engineering & Retrieval Benchmarking (Scoped Production-Grade Capabilities)
+
+> **Scope Rationale (Prototype vs. Enterprise):** Since this is an AI showcase and portfolio project rather than a live hospital-integrated EHR system, enterprise HIPAA and operational overhead is safely bypassed (no Presidio PHI middleware, no 6-year immutable audit log tables, no 4-tier RBAC, no Redis/PgBouncer connection clustering, and no daily ClinicalTrials.gov scraping daemons).
+> Instead, all effort focuses on **core RAG intelligence, rigorous retrieval benchmarking, and clinical UI trust**.
+
+- [x] **8.1 Multi-Turn Context & Query Augmentation (Context Retention):**
+  - **Problem:** When coordinators ask follow-up questions (e.g., Turn 1: *"Does NCT05794958 allow brain metastases?"* ➔ Turn 2: *"What about prior steroid use for that same patient?"*), naive RAG loses Turn 1's trial context because Turn 2's retrieval query is executed purely on the raw text `"What about prior steroid use for that same patient?"`.
+  - [x] File: `backend/app/chat/orchestrator.py`:
+    - Implement `build_retrieval_query(message: str, history: list[ChatMessage]) -> str`:
+      - Inspect preceding assistant turn for verified citations (`nct_id` and `section_header`).
+      - Prepend active NCT ID(s) and clinical anchors to the incoming user message prior to calling `retrieve_protocols()`.
+      - Prevents evidence starvation on follow-up turns while keeping retrieval focused on the active trial.
+  - [x] File: `backend/tests/test_multi_turn.py`:
+    - Unit & integration tests verifying:
+      - Standalone questions retain raw query text without extraneous prefixing.
+      - Follow-up questions without explicit NCT mentions successfully anchor to the previously cited protocol.
+      - Cross-turn grounding validation succeeds without hallucinated citations.
+
+- [ ] **8.2 Industry-Standard Retrieval & Grounding Evaluation Suite:**
+  - **Goal:** Benchmark the hybrid retrieval pipeline (pgvector + FTS + RRF) against industry-standard Information Retrieval (IR) and RAG metrics.
+  - [ ] **Benchmark Metrics Standard:**
+    - **Recall@1 (Top-1 Accuracy):** Proportion of queries where the exact target protocol chunk is ranked at position #1. Target: $\ge 60\%$.
+    - **Recall@3:** Proportion of queries where the target chunk appears in the top 3 retrieved results. Target: $\ge 80\%$.
+    - **Recall@5 / Recall@10 (Retrieval Ceiling):** Proportion of queries where the target chunk appears anywhere in the top 5 / 10 passages injected into the LLM context. Target: $\ge 95\%$.
+    - **MRR (Mean Reciprocal Rank):** Average reciprocal rank ($\frac{1}{\text{rank}}$) of the first relevant passage. Target: $\ge 0.70$.
+    - **Grounding / Citation Precision:** 100% of LLM-generated citations must match a retrieved chunk ID with an exact verbatim quote (0 tolerance for fabricated criteria).
+    - **Negative Refusal Precision & Recall:** 100% refusal rate on off-corpus queries and protocol silence questions ("protocol does not state [X]").
+  - [ ] File: `backend/eval/golden_dataset.json`:
+    - Curated golden evaluation set of 20–30 clinical queries across the 5 landmark cancer types (e.g., washout periods, biomarker exclusions, platelet thresholds, prior therapies).
+    - Schema per test case:
+      ```json
+      {
+        "query": "What is the mandatory washout period for prior immunotherapy in NCT05794958?",
+        "target_nct_id": "NCT05794958",
+        "expected_section": "Eligibility: Exclusion Criterion #4",
+        "target_keywords": ["immunotherapy", "washout", "28 days"],
+        "expected_refusal": false,
+        "difficulty": "medium"
+      }
+      ```
+  - [ ] File: `backend/eval/evaluate_retrieval.py`:
+    - CLI runner and automated eval script running offline or against test DB.
+    - Computes and prints a formatted terminal scorecard:
+      - `Recall@1`, `Recall@3`, `Recall@5`, `Recall@10`
+      - `Mean Reciprocal Rank (MRR)`
+      - `Citation Precision` & `Refusal Accuracy`
+      - Latency (P50 and P95 retrieval time)
+  - [ ] Integrate into CI (`backend/tests/`):
+    - Automated assertion test failing if `Recall@3` drops below threshold or if any ungrounded citation is generated.
+
+- [ ] **8.3 Clinical UI Trust & Polish (Presentation Layer):**
+  - [ ] **Persistent Clinical Disclaimer Footer**:
+    - File: `frontend/src/components/chat/ChatContainer.tsx` (and `frontend/src/pages/ChatPage.tsx`):
+    - Prominent clinical disclaimer banner:
+      > *"SCRI Oncology Copilot is an AI screening assistant, not a clinical decision system. All eligibility determinations must be confirmed against the source protocol before enrollment."*
+  - [ ] **Enhanced Citation Previews & Drawer Quick-Inspection**:
+    - File: `frontend/src/components/citations/CitationPopover.tsx`:
+    - Add quick-jump action: clicking "View in Protocol" opens the `TrialDetailDrawer` auto-scrolled and highlighted to that exact chunk index.
+  - [ ] **Lightweight User Feedback Mechanism**:
+    - File: `frontend/src/components/chat/ChatMessage.tsx`:
+    - Thumbs up / Thumbs down reaction buttons on assistant messages.
+    - Persist feedback state to chat message metadata for tracking answer quality.
+
 
