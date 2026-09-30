@@ -6,6 +6,7 @@ export interface ChatMessageItem {
   role: "user" | "assistant" | "system";
   content: string;
   createdAt?: Date;
+  metadata?: any;
 }
 
 interface UseChatStreamOptions {

@@ -16,9 +16,14 @@ import type { CitationData } from "./CitationPill";
 interface CitationDrawerProps {
   citation: CitationData | null;
   onClose: () => void;
+  onViewInProtocol?: (citation: CitationData) => void;
 }
 
-export function CitationDrawer({ citation, onClose }: CitationDrawerProps) {
+export function CitationDrawer({
+  citation,
+  onClose,
+  onViewInProtocol,
+}: CitationDrawerProps) {
   // Close on Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -129,15 +134,26 @@ export function CitationDrawer({ citation, onClose }: CitationDrawerProps) {
         </div>
 
         {/* Footer actions */}
-        <div className="p-4 border-t border-ash bg-graphite/40 flex items-center justify-between shrink-0">
-          <span className="text-[11px] text-fog">
-            Grounded clinical protocol evidence
-          </span>
+        <div className="p-4 border-t border-ash bg-graphite/40 flex items-center justify-between shrink-0 gap-2">
+          {onViewInProtocol && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onViewInProtocol(citation);
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium bg-slate-surface border border-teal-border/60 text-teal hover:bg-teal hover:text-void transition-all cursor-pointer shadow-xs"
+              title="Open full protocol and highlight this criterion"
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>View in Protocol</span>
+            </button>
+          )}
           <a
             href={externalUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium bg-teal hover:bg-teal/85 text-void transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium bg-teal hover:bg-teal/85 text-void transition-colors cursor-pointer ml-auto"
           >
             <span>View on ClinicalTrials.gov</span>
             <ExternalLink className="w-3.5 h-3.5" />

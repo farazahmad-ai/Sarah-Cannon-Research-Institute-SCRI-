@@ -6,18 +6,21 @@
  */
 
 import { useEffect, useRef, type RefObject } from "react";
+import { BookOpen } from "lucide-react";
 import type { CitationData } from "./CitationPill";
 
 interface CitationPopoverProps {
   citation: CitationData;
   onClose: () => void;
   anchorRef: RefObject<HTMLElement | null>;
+  onViewInProtocol?: (citation: CitationData) => void;
 }
 
 export function CitationPopover({
   citation,
   onClose,
   anchorRef,
+  onViewInProtocol,
 }: CitationPopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
 
@@ -94,13 +97,25 @@ export function CitationPopover({
       </div>
 
       {/* Footer */}
-      {amendmentDate && (
-        <div className="px-3.5 py-2 border-t border-ash">
-          <span className="text-[10px] text-fog">
-            Protocol amendment: {amendmentDate}
-          </span>
-        </div>
-      )}
+      <div className="px-3.5 py-2 border-t border-ash flex items-center justify-between gap-2 bg-graphite/40">
+        <span className="text-[10px] text-fog truncate">
+          {amendmentDate ? `Updated: ${amendmentDate}` : citation.nct_id}
+        </span>
+        {onViewInProtocol && (
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              onViewInProtocol(citation);
+            }}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-teal hover:text-void hover:bg-teal bg-teal-dim border border-teal-border/40 transition-colors cursor-pointer shrink-0"
+            title="Open and highlight in full protocol"
+          >
+            <BookOpen className="w-3 h-3" />
+            <span>View in Protocol</span>
+          </button>
+        )}
+      </div>
     </div>
   );
 }

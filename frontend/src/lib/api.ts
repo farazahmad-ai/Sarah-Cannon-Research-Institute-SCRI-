@@ -153,6 +153,14 @@ export interface MessageOut {
   role: "user" | "assistant";
   content: string;
   created_at: string;
+  metadata_json?: {
+    feedback?: {
+      rating?: "helpful" | "unhelpful";
+      comment?: string | null;
+      updated_at?: string;
+    };
+    [key: string]: any;
+  } | null;
   citations: CitationOut[];
 }
 
@@ -229,6 +237,19 @@ export const api = {
     /** Fetch message history for a thread. */
     messages: async (threadId: string): Promise<MessageOut[]> => {
       const res = await apiFetch(`/api/chat/threads/${threadId}/messages`);
+      return res.json();
+    },
+
+    /** Submit helpful / unhelpful clinical coordinator feedback on an assistant message. */
+    feedback: async (
+      messageId: string,
+      rating: "helpful" | "unhelpful",
+      comment?: string
+    ): Promise<MessageOut> => {
+      const res = await apiFetch(`/api/chat/messages/${messageId}/feedback`, {
+        method: "POST",
+        body: JSON.stringify({ rating, comment }),
+      });
       return res.json();
     },
   },

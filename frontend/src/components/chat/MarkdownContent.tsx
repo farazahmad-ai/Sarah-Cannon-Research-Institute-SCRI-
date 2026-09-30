@@ -20,6 +20,7 @@ interface MarkdownContentProps {
   citationMap: Map<string, CitationData>;
   citationNumberMap?: Map<string, number>;
   onSelectCitation?: (citation: CitationData) => void;
+  onViewInProtocol?: (citation: CitationData) => void;
 }
 
 /** Parse inline tokens: citations, bold, italic, code */
@@ -27,7 +28,8 @@ function renderInline(
   text: string,
   citationMap: Map<string, CitationData>,
   citationNumberMap?: Map<string, number>,
-  onSelectCitation?: (citation: CitationData) => void
+  onSelectCitation?: (citation: CitationData) => void,
+  onViewInProtocol?: (citation: CitationData) => void
 ): React.ReactNode[] {
   // Regex to match:
   // 1. Citations: [NCT01234567, Section Name] or [1]
@@ -62,7 +64,12 @@ function renderInline(
         );
       } else {
         elements.push(
-          <CitationPill key={`cit-${i}-${part}`} label={part} citation={citation} />
+          <CitationPill
+            key={`cit-${i}-${part}`}
+            label={part}
+            citation={citation}
+            onViewInProtocol={onViewInProtocol}
+          />
         );
       }
     }
@@ -71,7 +78,7 @@ function renderInline(
       const inner = part.slice(2, -2);
       elements.push(
         <strong key={`b-${i}`} className="font-semibold text-cloud">
-          {renderInline(inner, citationMap, citationNumberMap, onSelectCitation)}
+          {renderInline(inner, citationMap, citationNumberMap, onSelectCitation, onViewInProtocol)}
         </strong>
       );
     }
@@ -94,7 +101,7 @@ function renderInline(
     ) {
       elements.push(
         <em key={`em-${i}`} className="italic text-cloud/90">
-          {renderInline(part.slice(1, -1), citationMap, citationNumberMap, onSelectCitation)}
+          {renderInline(part.slice(1, -1), citationMap, citationNumberMap, onSelectCitation, onViewInProtocol)}
         </em>
       );
     }
@@ -112,6 +119,7 @@ export function MarkdownContent({
   citationMap,
   citationNumberMap,
   onSelectCitation,
+  onViewInProtocol,
 }: MarkdownContentProps) {
   if (!content) return null;
 
@@ -131,7 +139,7 @@ export function MarkdownContent({
         <ul key={`ul-${key}`} className="my-2 space-y-1.5 pl-4 list-disc marker:text-teal">
           {items.map((item, idx) => (
             <li key={idx} className="leading-relaxed text-cloud text-[13px]">
-              {renderInline(item, citationMap, citationNumberMap, onSelectCitation)}
+              {renderInline(item, citationMap, citationNumberMap, onSelectCitation, onViewInProtocol)}
             </li>
           ))}
         </ul>
@@ -141,7 +149,7 @@ export function MarkdownContent({
         <ol key={`ol-${key}`} className="my-2 space-y-1.5 pl-4 list-decimal marker:text-teal font-mono text-[12px]">
           {items.map((item, idx) => (
             <li key={idx} className="leading-relaxed text-cloud text-[13px] font-sans">
-              {renderInline(item, citationMap, citationNumberMap, onSelectCitation)}
+              {renderInline(item, citationMap, citationNumberMap, onSelectCitation, onViewInProtocol)}
             </li>
           ))}
         </ol>
@@ -164,7 +172,7 @@ export function MarkdownContent({
       flushList(idx);
       nodes.push(
         <h4 key={`h4-${idx}`} className="font-semibold text-[13px] text-cloud tracking-tight mt-3 mb-1">
-          {renderInline(trimmed.slice(4), citationMap, citationNumberMap, onSelectCitation)}
+          {renderInline(trimmed.slice(4), citationMap, citationNumberMap, onSelectCitation, onViewInProtocol)}
         </h4>
       );
       continue;
@@ -175,7 +183,7 @@ export function MarkdownContent({
       flushList(idx);
       nodes.push(
         <h3 key={`h3-${idx}`} className="font-semibold text-[14px] text-cloud tracking-tight mt-3.5 mb-1.5">
-          {renderInline(trimmed.slice(3), citationMap, citationNumberMap, onSelectCitation)}
+          {renderInline(trimmed.slice(3), citationMap, citationNumberMap, onSelectCitation, onViewInProtocol)}
         </h3>
       );
       continue;
@@ -186,7 +194,7 @@ export function MarkdownContent({
       flushList(idx);
       nodes.push(
         <h2 key={`h2-${idx}`} className="font-bold text-[15px] text-cloud tracking-tight mt-4 mb-2">
-          {renderInline(trimmed.slice(2), citationMap, citationNumberMap, onSelectCitation)}
+          {renderInline(trimmed.slice(2), citationMap, citationNumberMap, onSelectCitation, onViewInProtocol)}
         </h2>
       );
       continue;
@@ -219,7 +227,7 @@ export function MarkdownContent({
       flushList(idx);
       nodes.push(
         <div key={`bq-${idx}`} className="my-2 pl-3 border-l-2 border-teal/40 text-fog text-[12px] italic">
-          {renderInline(trimmed.slice(2), citationMap, citationNumberMap, onSelectCitation)}
+          {renderInline(trimmed.slice(2), citationMap, citationNumberMap, onSelectCitation, onViewInProtocol)}
         </div>
       );
       continue;
@@ -229,7 +237,7 @@ export function MarkdownContent({
     flushList(idx);
     nodes.push(
       <p key={`p-${idx}`} className="my-1.5 leading-relaxed text-cloud text-[13px]">
-        {renderInline(trimmed, citationMap, citationNumberMap, onSelectCitation)}
+        {renderInline(trimmed, citationMap, citationNumberMap, onSelectCitation, onViewInProtocol)}
       </p>
     );
   }

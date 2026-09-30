@@ -7,6 +7,7 @@ Enforces:
 """
 
 import uuid
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -187,4 +188,47 @@ async def persist_turn(
     await session.refresh(user_msg)
     await session.refresh(assistant_msg, attribute_names=["citations"])
     return user_msg, assistant_msg
+
+
+async def record_message_feedback(
+    session: AsyncSession,
+    message_id: uuid.UUID | str,
+    user_id: uuid.UUID | str,
+    rating: str,
+    comment: str | None = None,
+) -> ChatMessage:
+    """Record coordinator feedback on an assistant message with tenancy verification."""
+    mid = _normalize_uuid(message_id)
+    uid = _normalize_uuid(user_id)
+
+    stmt = (
+        select(ChatMessage)
+        .where(ChatMessage.id == mid)
+        .options(selectinload(ChatMessage.citations))
+    )
+    result = await session.execute(stmt)
+    message = result.scalar_one_or_none()
+
+    if message is None:
+        raise ValueError(f"Chat message {mid} not found.")
+
+    # Ownership check via thread relationship
+    thread_res = await session.execute(
+        select(ChatThread.user_id).where(ChatThread.id == message.thread_id)
+    )
+    owner_id = thread_res.scalar_one_or_none()
+    if owner_id != uid:
+        raise PermissionError("Access denied: message belongs to another coordinator's thread.")
+
+    meta = dict(message.metadata_json or {})
+    meta["feedback"] = {
+        "rating": rating,
+        "comment": comment,
+        "updated_at": datetime.now(UTC).isoformat(),
+    }
+    message.metadata_json = meta
+    await session.flush()
+    await session.refresh(message, attribute_names=["citations"])
+    return message
+
 

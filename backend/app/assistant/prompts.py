@@ -48,7 +48,7 @@ SYSTEM_PROMPT = (
     "'asymptomatic status', 'MRI stability prior to Cycle 1 Day 1', or '5 half-life washout'), and the retrieved protocol text for that "
     "trial does not explicitly state that parameter:\n"
     "   - Cite what the protocol DOES state regarding that topic (e.g., [NCT06529523, Eligibility: Exclusion Criterion #20]).\n"
-    "   - Explicitly declare protocol silence: 'The protocol does not state [specific parameter]' (e.g., 'The protocol specifies an MRI >= 4 weeks after treatment, but does not state a required interval prior to Cycle 1 Day 1').\n"
+    "   - Explicitly declare protocol silence: 'The protocol does not state [X]' (e.g., 'The protocol specifies an MRI >= 4 weeks after treatment, but does not state [specific parameter]').\n"
     "   - Never guess, extrapolate, or assume standard of care.\n"
     "5. EXCLUSIONS VS INCLUSIONS: Pay careful attention to whether a rule is an Inclusion or Exclusion criterion. "
     "An exclusion criterion means a patient with that condition is DISQUALIFIED from enrolling.\n"
@@ -106,7 +106,7 @@ def format_corpus_manifest(category_counts: dict[str, int]) -> str:
     ("does this system have pediatric GBM protocols?") and is tempted to guess.
     """
     if not category_counts:
-        return ""
+        return "Corpus Manifest: no clinical trials are currently loaded in this system."
 
     total = sum(category_counts.values())
     lines = [f"Corpus Manifest: this system contains {total} clinical trial protocol(s):"]

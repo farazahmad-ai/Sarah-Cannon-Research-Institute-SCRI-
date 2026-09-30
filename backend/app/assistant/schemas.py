@@ -10,6 +10,7 @@ Defines schemas for:
 
 import uuid
 from datetime import date, datetime
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -78,6 +79,19 @@ class MessageCitationCreate(BaseModel):
     last_update_posted_date: date | None = None
 
 
+class MessageFeedbackPayload(BaseModel):
+    """Payload for submitting feedback on an assistant message."""
+
+    rating: Literal["helpful", "unhelpful"] = Field(
+        description="Clinical usefulness rating from coordinator: 'helpful' or 'unhelpful'."
+    )
+    comment: str | None = Field(
+        default=None,
+        max_length=1000,
+        description="Optional qualitative clinical commentary or explanation.",
+    )
+
+
 class MessageOut(BaseModel):
     """Response model for individual chat messages."""
 
@@ -88,6 +102,7 @@ class MessageOut(BaseModel):
     role: str
     content: str
     created_at: datetime
+    metadata_json: dict[str, Any] | None = None
     citations: list[CitationOut] = Field(default_factory=list)
 
 

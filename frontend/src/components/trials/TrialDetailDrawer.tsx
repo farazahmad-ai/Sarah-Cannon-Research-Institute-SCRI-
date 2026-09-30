@@ -6,14 +6,16 @@
  * and scrollable protocol chunks grouped by section type.
  */
 
-import { useEffect, useState } from "react";
-import { X, ExternalLink } from "lucide-react";
-import { api, type TrialDetail } from "@/lib/api";
+import { useEffect, useState, useRef } from "react";
+import { X, ExternalLink, ShieldCheck } from "lucide-react";
+import { api, type TrialDetail, type TrialChunkOut } from "@/lib/api";
 import { formatCategory } from "./TrialCard";
 
 interface TrialDetailDrawerProps {
   nctId: string;
   onClose: () => void;
+  highlightSection?: string;
+  highlightQuote?: string;
 }
 
 /** Group chunks by their section_type for organized display. */
@@ -38,10 +40,47 @@ function formatSectionType(sectionType: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export function TrialDetailDrawer({ nctId, onClose }: TrialDetailDrawerProps) {
+/** Check if a protocol chunk matches the target citation criteria. */
+function isChunkTarget(
+  chunk: TrialChunkOut,
+  highlightSection?: string,
+  highlightQuote?: string
+): boolean {
+  if (!highlightSection && !highlightQuote) return false;
+  if (highlightSection) {
+    const cleanSection = highlightSection.replace(/^eligibility:\s*/i, "").trim().toLowerCase();
+    const cleanTitle = chunk.section_title.replace(/^eligibility:\s*/i, "").trim().toLowerCase();
+    if (cleanTitle === cleanSection || cleanTitle.includes(cleanSection) || cleanSection.includes(cleanTitle)) {
+      return true;
+    }
+    // Criterion number match (e.g. Exclusion Criterion #4)
+    const secNum = highlightSection.match(/(?:criterion\s*#?|#)\s*(\d+)/i);
+    const titleNum = chunk.section_title.match(/(?:criterion\s*#?|#)\s*(\d+)/i);
+    if (secNum && titleNum && secNum[1] === titleNum[1]) {
+      const secExcl = /exclusion/i.test(highlightSection);
+      const titleExcl = /exclusion/i.test(chunk.section_title);
+      if (secExcl === titleExcl) return true;
+    }
+  }
+  if (highlightQuote && highlightQuote.length > 20) {
+    const sample = highlightQuote.slice(0, 40).toLowerCase();
+    if (chunk.chunk_text.toLowerCase().includes(sample)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function TrialDetailDrawer({
+  nctId,
+  onClose,
+  highlightSection,
+  highlightQuote,
+}: TrialDetailDrawerProps) {
   const [trial, setTrial] = useState<TrialDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const targetElementRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -52,6 +91,16 @@ export function TrialDetailDrawer({ nctId, onClose }: TrialDetailDrawerProps) {
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
   }, [nctId]);
+
+  // Auto-scroll to target chunk if highlighted
+  useEffect(() => {
+    if (!loading && trial && targetElementRef.current) {
+      const timer = setTimeout(() => {
+        targetElementRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, trial]);
 
   // Close on Escape
   useEffect(() => {
@@ -225,19 +274,47 @@ export function TrialDetailDrawer({ nctId, onClose }: TrialDetailDrawerProps) {
                             {formatSectionType(sectionType)}
                           </h4>
                           <div className="space-y-2">
-                            {sectionChunks.map((chunk) => (
-                              <div
-                                key={chunk.id}
-                                className="border-l-2 border-ash pl-3 py-1"
-                              >
-                                <div className="text-[10px] text-fog mb-1">
-                                  {chunk.section_title}
+                            {sectionChunks.map((chunk) => {
+                              const isTarget = isChunkTarget(chunk, highlightSection, highlightQuote);
+                              return (
+                                <div
+                                  key={chunk.id}
+                                  ref={(el) => {
+                                    if (isTarget && !targetElementRef.current) {
+                                      targetElementRef.current = el;
+                                    }
+                                  }}
+                                  className={`transition-all rounded-r-lg ${
+                                    isTarget
+                                      ? "border-l-4 border-l-teal bg-teal-dim/35 ring-1 ring-teal/50 shadow-xs p-3.5 my-2"
+                                      : "border-l-2 border-ash pl-3 py-1"
+                                  }`}
+                                >
+                                  {isTarget && (
+                                    <div className="flex items-center gap-1.5 font-mono text-[10px] font-bold text-teal bg-teal-dim px-2 py-0.5 rounded border border-teal-border/50 mb-2 w-fit">
+                                      <ShieldCheck className="w-3 h-3 text-teal" />
+                                      <span>TARGET CITATION REFERENCE</span>
+                                    </div>
+                                  )}
+                                  <div
+                                    className={`text-[10px] mb-1 font-medium ${
+                                      isTarget ? "text-teal" : "text-fog"
+                                    }`}
+                                  >
+                                    {chunk.section_title}
+                                  </div>
+                                  <p
+                                    className={`text-[12px] leading-relaxed whitespace-pre-wrap select-text ${
+                                      isTarget
+                                        ? "text-cloud font-medium"
+                                        : "text-cloud/85"
+                                    }`}
+                                  >
+                                    {chunk.chunk_text}
+                                  </p>
                                 </div>
-                                <p className="text-[12px] text-cloud/85 leading-relaxed whitespace-pre-wrap select-text">
-                                  {chunk.chunk_text}
-                                </p>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       )

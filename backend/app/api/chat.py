@@ -14,7 +14,13 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.assistant.schemas import ChatRequest, MessageOut, ThreadCreate, ThreadOut
+from app.assistant.schemas import (
+    ChatRequest,
+    MessageFeedbackPayload,
+    MessageOut,
+    ThreadCreate,
+    ThreadOut,
+)
 from app.auth.jwt import AuthenticatedUser, get_current_user
 from app.chat.orchestrator import stream_chat_turn
 from app.database.chats import (
@@ -23,6 +29,7 @@ from app.database.chats import (
     get_thread,
     list_messages,
     list_threads,
+    record_message_feedback,
     upsert_profile,
 )
 from app.database.session import async_session_factory, get_db_session
@@ -119,6 +126,42 @@ async def get_thread_messages(
         ) from exc
 
     return [MessageOut.model_validate(m) for m in messages]
+
+
+@chat_router.post(
+    "/messages/{message_id}/feedback",
+    response_model=MessageOut,
+    summary="Record clinical coordinator feedback on a message",
+)
+async def submit_message_feedback(
+    message_id: uuid.UUID,
+    payload: MessageFeedbackPayload,
+    db: AsyncSession = Depends(get_db_session),
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> MessageOut:
+    """Record coordinator feedback ('helpful' or 'unhelpful') for an assistant response."""
+    user_uuid = uuid.UUID(user.id) if isinstance(user.id, str) else user.id
+    try:
+        updated = await record_message_feedback(
+            db,
+            message_id=message_id,
+            user_id=user_uuid,
+            rating=payload.rating,
+            comment=payload.comment,
+        )
+        await db.commit()
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
+
+    return MessageOut.model_validate(updated)
 
 
 @chat_router.post(

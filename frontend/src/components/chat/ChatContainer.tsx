@@ -16,6 +16,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { ChatMessage } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
 import { CitationDrawer } from "@/components/citations/CitationDrawer";
+import { TrialDetailDrawer } from "@/components/trials/TrialDetailDrawer";
 import type { CitationData } from "@/components/citations/CitationPill";
 import type { CitationOut } from "@/lib/api";
 
@@ -68,6 +69,11 @@ export function ChatContainer({
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
   const [activeCitation, setActiveCitation] = useState<CitationData | null>(null);
+  const [inspectingProtocol, setInspectingProtocol] = useState<{
+    nctId: string;
+    sectionHeader?: string;
+    verbatimQuote?: string;
+  } | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   /** Citation data keyed by message ID for interactive pills. */
@@ -113,6 +119,7 @@ export function ChatContainer({
             role: m.role as "user" | "assistant",
             content: m.content,
             createdAt: new Date(m.created_at),
+            metadata: m.metadata_json,
           }))
         );
       }
@@ -201,6 +208,7 @@ export function ChatContainer({
               role: m.role as "user" | "assistant",
               content: m.content,
               createdAt: new Date(m.created_at),
+              metadata: m.metadata_json,
             }))
           );
         }
@@ -349,12 +357,22 @@ export function ChatContainer({
                       <div className="border-t border-ash/40 my-1" />
                     )}
                     <ChatMessage
+                      id={m.id}
                       role={m.role as "user" | "assistant"}
                       content={m.content}
                       createdAt={m.createdAt ? m.createdAt.toISOString() : undefined}
                       isStreaming={isLastAssistant && isLoading}
+                      metadata={m.metadata}
                       citations={messageCitations}
                       onSelectCitation={(citation) => setActiveCitation(citation)}
+                      onViewInProtocol={(citation) => {
+                        setActiveCitation(null);
+                        setInspectingProtocol({
+                          nctId: citation.nct_id,
+                          sectionHeader: citation.section_header,
+                          verbatimQuote: citation.verbatim_quote,
+                        });
+                      }}
                     />
                   </div>
                 );
@@ -386,7 +404,25 @@ export function ChatContainer({
       <CitationDrawer
         citation={activeCitation}
         onClose={() => setActiveCitation(null)}
+        onViewInProtocol={(citation) => {
+          setActiveCitation(null);
+          setInspectingProtocol({
+            nctId: citation.nct_id,
+            sectionHeader: citation.section_header,
+            verbatimQuote: citation.verbatim_quote,
+          });
+        }}
       />
+
+      {/* Slide-over Full Protocol Detail Viewer with Highlight */}
+      {inspectingProtocol && (
+        <TrialDetailDrawer
+          nctId={inspectingProtocol.nctId}
+          highlightSection={inspectingProtocol.sectionHeader}
+          highlightQuote={inspectingProtocol.verbatimQuote}
+          onClose={() => setInspectingProtocol(null)}
+        />
+      )}
     </div>
   );
 }

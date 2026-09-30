@@ -568,17 +568,17 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
   - [x] Integrate into CI (`backend/tests/test_retrieval_benchmarks.py`):
     - Automated assertion test verifying that `latest_report.json` meets all SLA targets and providing a live `@pytest.mark.integration` runner.
 
-- [ ] **8.3 Clinical UI Trust & Polish (Presentation Layer):**
-  - [ ] **Persistent Clinical Disclaimer Footer**:
-    - File: `frontend/src/components/chat/ChatContainer.tsx` (and `frontend/src/pages/ChatPage.tsx`):
+- [x] **8.3 Clinical UI Trust & Polish (Presentation Layer):**
+  - [x] **Persistent Clinical Disclaimer Footer**:
+    - File: `frontend/src/components/chat/ChatContainer.tsx` (and `frontend/src/components/chat/ChatInput.tsx`):
     - Prominent clinical disclaimer banner:
       > *"SCRI Oncology Copilot is an AI screening assistant, not a clinical decision system. All eligibility determinations must be confirmed against the source protocol before enrollment."*
-  - [ ] **Enhanced Citation Previews & Drawer Quick-Inspection**:
-    - File: `frontend/src/components/citations/CitationPopover.tsx`:
-    - Add quick-jump action: clicking "View in Protocol" opens the `TrialDetailDrawer` auto-scrolled and highlighted to that exact chunk index.
-  - [ ] **Lightweight User Feedback Mechanism**:
-    - File: `frontend/src/components/chat/ChatMessage.tsx`:
+  - [x] **Enhanced Citation Previews & Drawer Quick-Inspection**:
+    - Files: `frontend/src/components/citations/CitationPopover.tsx`, `frontend/src/components/citations/CitationDrawer.tsx`, `frontend/src/components/trials/TrialDetailDrawer.tsx`:
+    - Added quick-jump action: clicking "View in Protocol" opens the `TrialDetailDrawer` auto-scrolled and highlighted with a glowing teal accent to that exact cited chunk.
+  - [x] **Lightweight User Feedback Mechanism**:
+    - Files: `frontend/src/components/chat/ChatMessage.tsx`, `backend/app/api/chat.py`, `backend/app/database/chats.py`:
     - Thumbs up / Thumbs down reaction buttons on assistant messages.
-    - Persist feedback state to chat message metadata for tracking answer quality.
+    - Persists feedback state (`helpful` / `unhelpful`) to chat message `metadata_json` with user tenancy verification for tracking answer quality.
 
 

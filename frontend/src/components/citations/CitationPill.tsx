@@ -22,9 +22,11 @@ interface CitationPillProps {
   label: string;
   /** Structured citation data for the popover. If unavailable, pill is non-interactive. */
   citation?: CitationData;
+  /** Handler to open full protocol viewer */
+  onViewInProtocol?: (citation: CitationData) => void;
 }
 
-export function CitationPill({ label, citation }: CitationPillProps) {
+export function CitationPill({ label, citation, onViewInProtocol }: CitationPillProps) {
   const [open, setOpen] = useState(false);
   const pillRef = useRef<HTMLButtonElement>(null);
 
@@ -54,6 +56,7 @@ export function CitationPill({ label, citation }: CitationPillProps) {
           citation={citation}
           onClose={() => setOpen(false)}
           anchorRef={pillRef}
+          onViewInProtocol={onViewInProtocol}
         />
       )}
     </span>

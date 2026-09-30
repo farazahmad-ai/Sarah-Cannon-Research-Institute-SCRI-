@@ -6,20 +6,32 @@
  * Citations: interactive CitationPill components that open popovers.
  */
 
-import { User } from "lucide-react";
+import { useState } from "react";
+import { User, ThumbsUp, ThumbsDown, BookOpen } from "lucide-react";
 import type { CitationData } from "@/components/citations/CitationPill";
-import type { CitationOut } from "@/lib/api";
+import { api, type CitationOut } from "@/lib/api";
 import { MarkdownContent } from "./MarkdownContent";
 
 export interface MessageProps {
+  id?: string;
   role: "user" | "assistant" | "system";
   content: string;
   createdAt?: string;
   isStreaming?: boolean;
+  metadata?: {
+    feedback?: {
+      rating?: "helpful" | "unhelpful";
+      comment?: string | null;
+      updated_at?: string;
+    };
+    [key: string]: any;
+  } | null;
   /** Structured citation data from backend for this message. */
   citations?: CitationOut[];
   /** Handler to open the citation drawer */
   onSelectCitation?: (citation: CitationData) => void;
+  /** Handler to jump directly to full protocol viewer */
+  onViewInProtocol?: (citation: CitationData) => void;
 }
 
 class TolerantCitationMap extends Map<string, CitationData> {
@@ -151,15 +163,39 @@ function prepareCitations(citations: CitationOut[] | undefined): {
 }
 
 export function ChatMessage({
+  id,
   role,
   content,
   createdAt,
   isStreaming = false,
+  metadata,
   citations,
   onSelectCitation,
+  onViewInProtocol,
 }: MessageProps) {
   const isUser = role === "user";
   const { citationMap, citationNumberMap, uniqueCitations } = prepareCitations(citations);
+
+  const [feedback, setFeedback] = useState<"helpful" | "unhelpful" | null>(
+    metadata?.feedback?.rating ?? null
+  );
+  const [feedbackStatus, setFeedbackStatus] = useState<string | null>(null);
+
+  const handleFeedback = async (rating: "helpful" | "unhelpful") => {
+    if (isStreaming) return;
+    const nextRating = feedback === rating ? null : rating;
+    setFeedback(nextRating);
+
+    if (nextRating && id) {
+      try {
+        await api.chat.feedback(id, nextRating);
+        setFeedbackStatus(nextRating === "helpful" ? "Helpful" : "Recorded");
+        setTimeout(() => setFeedbackStatus(null), 3000);
+      } catch (err) {
+        console.error("Failed to submit feedback:", err);
+      }
+    }
+  };
 
   return (
     <div className={`flex gap-3.5 py-4 ${isUser ? "opacity-90" : ""}`}>
@@ -218,6 +254,7 @@ export function ChatMessage({
                 citationMap={citationMap}
                 citationNumberMap={citationNumberMap}
                 onSelectCitation={onSelectCitation}
+                onViewInProtocol={onViewInProtocol}
               />
 
               {/* Bottom Reference Pills */}
@@ -228,24 +265,85 @@ export function ChatMessage({
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {uniqueCitations.map((c, i) => (
-                      <button
+                      <div
                         key={`${c.nct_id}-${i}`}
-                        type="button"
-                        onClick={() => onSelectCitation?.(c)}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] bg-graphite border border-ash hover:border-teal/50 hover:bg-teal-dim/30 text-cloud transition-all cursor-pointer shadow-xs group"
-                        title="Click to view verbatim protocol excerpt"
+                        className="inline-flex items-center rounded-md bg-graphite border border-ash shadow-xs group"
                       >
-                        <span className="font-mono text-[10px] font-bold text-teal bg-teal-dim px-1.5 py-0.2 rounded border border-teal-border/40">
-                          {i + 1}
-                        </span>
-                        <span className="font-mono font-medium text-teal text-[11px]">
-                          {c.nct_id}
-                        </span>
-                        <span className="text-fog group-hover:text-cloud transition-colors truncate max-w-[240px]">
-                          {c.section_header.replace(/^eligibility:\s*/i, "")}
-                        </span>
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => onSelectCitation?.(c)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] hover:text-teal hover:bg-teal-dim/20 transition-all cursor-pointer rounded-l-md"
+                          title="Click to view verbatim protocol excerpt"
+                        >
+                          <span className="font-mono text-[10px] font-bold text-teal bg-teal-dim px-1.5 py-0.2 rounded border border-teal-border/40">
+                            {i + 1}
+                          </span>
+                          <span className="font-mono font-medium text-teal text-[11px]">
+                            {c.nct_id}
+                          </span>
+                          <span className="text-fog group-hover:text-cloud transition-colors truncate max-w-[200px]">
+                            {c.section_header.replace(/^eligibility:\s*/i, "")}
+                          </span>
+                        </button>
+                        {onViewInProtocol && (
+                          <button
+                            type="button"
+                            onClick={() => onViewInProtocol(c)}
+                            className="p-1.5 text-fog/60 hover:text-teal hover:bg-teal-dim/40 border-l border-ash/60 transition-colors cursor-pointer rounded-r-md"
+                            title="Inspect in full protocol viewer"
+                            aria-label={`View ${c.nct_id} in protocol viewer`}
+                          >
+                            <BookOpen className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Coordinator Feedback & Safety Assurance */}
+              {!isStreaming && (
+                <div className="mt-3.5 pt-2 flex items-center justify-between border-t border-ash/40 text-[11px] text-fog select-none">
+                  <span className="text-[10px] text-fog/70 italic hidden md:inline">
+                    Verbatim evidence grounded in ClinicalTrials.gov
+                  </span>
+
+                  <div className="flex items-center gap-1.5 ml-auto">
+                    <span className="text-[10px] text-fog/60 mr-1">Was this accurate?</span>
+                    <button
+                      type="button"
+                      onClick={() => handleFeedback("helpful")}
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] transition-colors cursor-pointer ${
+                        feedback === "helpful"
+                          ? "bg-teal-dim text-teal border border-teal-border/50 font-medium"
+                          : "text-fog/70 hover:text-cloud hover:bg-ash/40 border border-transparent"
+                      }`}
+                      title="Helpful — criteria matches protocol"
+                      aria-label="Helpful"
+                    >
+                      <ThumbsUp className="w-3 h-3" />
+                      <span className="text-[10px]">Helpful</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleFeedback("unhelpful")}
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] transition-colors cursor-pointer ${
+                        feedback === "unhelpful"
+                          ? "bg-rose-500/10 text-rose-400 border border-rose-500/30 font-medium"
+                          : "text-fog/70 hover:text-cloud hover:bg-ash/40 border border-transparent"
+                      }`}
+                      title="Unhelpful — needs refinement"
+                      aria-label="Unhelpful"
+                    >
+                      <ThumbsDown className="w-3 h-3" />
+                      <span className="text-[10px]">Unhelpful</span>
+                    </button>
+                    {feedbackStatus && (
+                      <span className="text-[10px] text-teal ml-1 font-medium animate-in fade-in duration-150">
+                        {feedbackStatus}
+                      </span>
+                    )}
                   </div>
                 </div>
               )}

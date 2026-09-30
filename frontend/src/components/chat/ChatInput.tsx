@@ -6,7 +6,7 @@
  */
 
 import React, { useEffect, useRef } from "react";
-import { ArrowUp, Square } from "lucide-react";
+import { ArrowUp, Square, ShieldAlert } from "lucide-react";
 
 interface ChatInputProps {
   input: string;
@@ -88,9 +88,12 @@ export function ChatInput({
         </div>
       </div>
 
-      <p className="text-[11px] text-fog/70 text-center mt-2 font-normal">
-        Answers are strictly grounded in ClinicalTrials.gov protocols. Not medical advice.
-      </p>
+      <div className="flex items-center justify-center gap-1.5 mt-2 px-3 py-1 rounded-md text-[11px] text-fog/90 bg-graphite/40 border border-ash/40 max-w-2xl mx-auto text-center leading-normal select-none">
+        <ShieldAlert className="w-3.5 h-3.5 text-teal shrink-0" />
+        <span>
+          <strong className="font-semibold text-cloud">Clinical Screening Assistant:</strong> Not a clinical decision system. All eligibility determinations must be confirmed against the source protocol before enrollment.
+        </span>
+      </div>
     </form>
   );
 }

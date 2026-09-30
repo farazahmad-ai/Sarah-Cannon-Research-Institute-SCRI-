@@ -95,3 +95,65 @@ async def test_tenancy_ownership_enforcement_raises_permission_error():
         await get_thread(mock_session, thread_id, user_a_id)
 
     assert "Access denied: thread belongs to another coordinator." in str(exc_info.value)
+
+
+def test_message_feedback_schema():
+    """Verify MessageFeedbackPayload and MessageOut metadata_json serialization."""
+    from app.assistant.schemas import MessageFeedbackPayload
+
+    payload = MessageFeedbackPayload(rating="helpful", comment="Clear explanation of washout.")
+    assert payload.rating == "helpful"
+    assert payload.comment == "Clear explanation of washout."
+
+    msg = MessageOut(
+        id=uuid.uuid4(),
+        thread_id=uuid.uuid4(),
+        role="assistant",
+        content="Evidence response.",
+        created_at=datetime.now(UTC),
+        metadata_json={"feedback": {"rating": "helpful"}},
+    )
+    assert msg.metadata_json is not None
+    assert msg.metadata_json["feedback"]["rating"] == "helpful"
+
+
+@pytest.mark.anyio
+async def test_record_message_feedback_tenancy():
+    """Feedback on a message belonging to another user must raise PermissionError."""
+    from app.database.chats import record_message_feedback
+    from app.database.models import ChatMessage
+
+    user_a_id = uuid.uuid4()
+    user_b_id = uuid.uuid4()
+    msg_id = uuid.uuid4()
+    thread_id = uuid.uuid4()
+
+    mock_msg = ChatMessage(
+        id=msg_id,
+        thread_id=thread_id,
+        role="assistant",
+        content="Response",
+    )
+
+    class MockFeedbackSession:
+        async def execute(self, stmt):
+            class MockResult:
+                def __init__(self, val):
+                    self.val = val
+                def scalar_one_or_none(self):
+                    return self.val
+            # Check query intent:
+            stmt_str = str(stmt)
+            if "chat_messages" in stmt_str:
+                return MockResult(mock_msg)
+            # Thread query: belongs to user_b
+            return MockResult(user_b_id)
+
+    mock_session = MockFeedbackSession()
+
+    # User A tries to give feedback on User B's thread message
+    with pytest.raises(PermissionError) as exc_info:
+        await record_message_feedback(mock_session, msg_id, user_a_id, "helpful")
+
+    assert "Access denied: message belongs to another coordinator's thread." in str(exc_info.value)
+
