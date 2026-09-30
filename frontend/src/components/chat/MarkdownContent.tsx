@@ -128,6 +128,8 @@ export function MarkdownContent({
   const nodes: React.ReactNode[] = [];
 
   let currentList: { type: "ul" | "ol"; items: string[] } | null = null;
+  let currentTable: string[] | null = null;
+  let currentCodeBlock: { lang: string; lines: string[] } | null = null;
 
   const flushList = (key: number) => {
     if (!currentList) return;
@@ -157,52 +159,166 @@ export function MarkdownContent({
     }
   };
 
+  const flushTable = (key: number) => {
+    if (!currentTable || currentTable.length === 0) return;
+    const tableLines = currentTable;
+    currentTable = null;
+
+    const rows = tableLines.map((line) =>
+      line
+        .trim()
+        .replace(/^\|/, "")
+        .replace(/\|$/, "")
+        .split("|")
+        .map((cell) => cell.trim())
+    );
+
+    if (rows.length === 0) return;
+
+    const hasSeparator = rows.length > 1 && rows[1].every((c) => /^:?-+:?$/.test(c));
+    const headerRow = rows[0];
+    const dataRows = hasSeparator ? rows.slice(2) : rows.slice(1);
+
+    nodes.push(
+      <div key={`table-wrapper-${key}`} className="my-3 overflow-x-auto rounded-lg border border-ash bg-graphite/40 shadow-xs">
+        <table className="w-full text-left text-[12px] text-cloud border-collapse">
+          <thead>
+            <tr className="border-b border-ash bg-slate-surface">
+              {headerRow.map((cell, cIdx) => (
+                <th key={`th-${cIdx}`} className="px-3.5 py-2 font-semibold text-teal tracking-tight whitespace-nowrap">
+                  {renderInline(cell, citationMap, citationNumberMap, onSelectCitation, onViewInProtocol)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {dataRows.map((row, rIdx) => (
+              <tr key={`tr-${rIdx}`} className="border-b border-ash/40 hover:bg-ash/20 transition-colors">
+                {row.map((cell, cIdx) => (
+                  <td key={`td-${cIdx}`} className="px-3.5 py-2 leading-relaxed text-cloud/90 align-top">
+                    {renderInline(cell, citationMap, citationNumberMap, onSelectCitation, onViewInProtocol)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
+  const flushCodeBlock = (key: number) => {
+    if (!currentCodeBlock) return;
+    const { lang, lines: codeLines } = currentCodeBlock;
+    currentCodeBlock = null;
+
+    nodes.push(
+      <div key={`code-block-${key}`} className="my-2.5 rounded-lg bg-graphite border border-ash overflow-hidden">
+        {lang && (
+          <div className="px-3 py-1 bg-slate-surface border-b border-ash font-mono text-[10px] text-fog uppercase tracking-wider">
+            {lang}
+          </div>
+        )}
+        <pre className="p-3 font-mono text-[11px] text-cloud overflow-x-auto leading-relaxed select-text">
+          <code>{codeLines.join("\n")}</code>
+        </pre>
+      </div>
+    );
+  };
+
   for (let idx = 0; idx < lines.length; idx++) {
     const rawLine = lines[idx];
     const trimmed = rawLine.trim();
 
+    // Check for fenced code block toggle
+    if (trimmed.startsWith("```")) {
+      if (currentCodeBlock) {
+        flushCodeBlock(idx);
+      } else {
+        flushList(idx);
+        flushTable(idx);
+        currentCodeBlock = { lang: trimmed.slice(3).trim(), lines: [] };
+      }
+      continue;
+    }
+
+    // Inside code block — accumulate raw lines
+    if (currentCodeBlock) {
+      currentCodeBlock.lines.push(rawLine);
+      continue;
+    }
+
     // Check for empty line
     if (!trimmed) {
       flushList(idx);
+      flushTable(idx);
       continue;
     }
 
-    // 1. Heading 3: ### Title
-    if (trimmed.startsWith("### ")) {
+    // Horizontal rule: ---, ***, or ___
+    if (/^(?:---|___|\*\*\*)$/.test(trimmed)) {
       flushList(idx);
-      nodes.push(
-        <h4 key={`h4-${idx}`} className="font-semibold text-[13px] text-cloud tracking-tight mt-3 mb-1">
-          {renderInline(trimmed.slice(4), citationMap, citationNumberMap, onSelectCitation, onViewInProtocol)}
-        </h4>
-      );
+      flushTable(idx);
+      nodes.push(<hr key={`hr-${idx}`} className="my-3.5 border-ash/70" />);
       continue;
     }
 
-    // 2. Heading 2: ## Title
-    if (trimmed.startsWith("## ")) {
+    // Headings 1 through 6: #, ##, ###, ####, #####, ######
+    const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)$/);
+    if (headingMatch) {
       flushList(idx);
-      nodes.push(
-        <h3 key={`h3-${idx}`} className="font-semibold text-[14px] text-cloud tracking-tight mt-3.5 mb-1.5">
-          {renderInline(trimmed.slice(3), citationMap, citationNumberMap, onSelectCitation, onViewInProtocol)}
-        </h3>
-      );
+      flushTable(idx);
+      const level = headingMatch[1].length;
+      const headingText = headingMatch[2];
+      const inline = renderInline(headingText, citationMap, citationNumberMap, onSelectCitation, onViewInProtocol);
+
+      if (level === 1) {
+        nodes.push(
+          <h2 key={`h2-${idx}`} className="font-bold text-[15px] text-cloud tracking-tight mt-4 mb-2">
+            {inline}
+          </h2>
+        );
+      } else if (level === 2) {
+        nodes.push(
+          <h3 key={`h3-${idx}`} className="font-semibold text-[14px] text-cloud tracking-tight mt-3.5 mb-1.5">
+            {inline}
+          </h3>
+        );
+      } else if (level === 3) {
+        nodes.push(
+          <h4 key={`h4-${idx}`} className="font-semibold text-[13px] text-cloud tracking-tight mt-3 mb-1">
+            {inline}
+          </h4>
+        );
+      } else if (level === 4) {
+        nodes.push(
+          <h5 key={`h5-${idx}`} className="font-semibold text-[13px] text-teal tracking-tight mt-3 mb-1 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-teal shrink-0" />
+            <span>{inline}</span>
+          </h5>
+        );
+      } else {
+        nodes.push(
+          <h6 key={`h6-${idx}`} className="font-semibold text-[12px] text-fog uppercase tracking-wider mt-2.5 mb-1">
+            {inline}
+          </h6>
+        );
+      }
       continue;
     }
 
-    // 3. Heading 1: # Title
-    if (trimmed.startsWith("# ")) {
+    // Table rows: | Col 1 | Col 2 |
+    if (trimmed.startsWith("|") && trimmed.endsWith("|") && trimmed.includes("|")) {
       flushList(idx);
-      nodes.push(
-        <h2 key={`h2-${idx}`} className="font-bold text-[15px] text-cloud tracking-tight mt-4 mb-2">
-          {renderInline(trimmed.slice(2), citationMap, citationNumberMap, onSelectCitation, onViewInProtocol)}
-        </h2>
-      );
+      if (!currentTable) currentTable = [];
+      currentTable.push(trimmed);
       continue;
     }
 
     // 4. Bullet list items: * or -
     const bulletMatch = trimmed.match(/^[-*]\s+(.*)$/);
     if (bulletMatch) {
+      flushTable(idx);
       if (!currentList || currentList.type !== "ul") {
         flushList(idx);
         currentList = { type: "ul", items: [] };
@@ -214,6 +330,7 @@ export function MarkdownContent({
     // 5. Numbered list items: 1. or 2.
     const numberedMatch = trimmed.match(/^\d+\.\s+(.*)$/);
     if (numberedMatch) {
+      flushTable(idx);
       if (!currentList || currentList.type !== "ol") {
         flushList(idx);
         currentList = { type: "ol", items: [] };
@@ -225,6 +342,7 @@ export function MarkdownContent({
     // 6. Blockquote: > text
     if (trimmed.startsWith("> ")) {
       flushList(idx);
+      flushTable(idx);
       nodes.push(
         <div key={`bq-${idx}`} className="my-2 pl-3 border-l-2 border-teal/40 text-fog text-[12px] italic">
           {renderInline(trimmed.slice(2), citationMap, citationNumberMap, onSelectCitation, onViewInProtocol)}
@@ -235,6 +353,7 @@ export function MarkdownContent({
 
     // 7. Regular paragraph
     flushList(idx);
+    flushTable(idx);
     nodes.push(
       <p key={`p-${idx}`} className="my-1.5 leading-relaxed text-cloud text-[13px]">
         {renderInline(trimmed, citationMap, citationNumberMap, onSelectCitation, onViewInProtocol)}
@@ -243,6 +362,8 @@ export function MarkdownContent({
   }
 
   flushList(lines.length);
+  flushTable(lines.length);
+  if (currentCodeBlock) flushCodeBlock(lines.length);
 
   return <div className="space-y-1">{nodes}</div>;
 }
