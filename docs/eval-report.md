@@ -71,5 +71,5 @@
    ```bash
    uv run python eval/evaluate_retrieval.py
    ```
-4. **Benchmark Integrity & Roadmap:** For a detailed breakdown of dataset curation trade-offs, token cost considerations, and our roadmap for future independent validation (RAGAS, cross-model synthesis, and human clinical annotation), see [docs/future-plan.md](file:///d:/FarazAhmad-ai/projects/Sarah%20Cannon%20Research%20Institute%20(SCRI)/docs/future-plan.md#4-evaluation-methodology-benchmark-integrity--future-validation-roadmap).
+4. **Benchmark Integrity & Roadmap:** For a detailed breakdown of dataset curation trade-offs, token cost considerations, and our roadmap for future independent validation (RAGAS, cross-model synthesis, and human clinical annotation), see [docs/future-implementations.md](file:///d:/FarazAhmad-ai/projects/Sarah%20Cannon%20Research%20Institute%20(SCRI)/docs/future-implementations.md#5-evaluation-methodology-benchmark-integrity--future-validation-roadmap).
 
