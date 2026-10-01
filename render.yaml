@@ -53,7 +53,6 @@ services:
     runtime: static
     name: scri-copilot-frontend
     rootDir: frontend
-    plan: free
     buildCommand: pnpm install && pnpm build
     staticPublishPath: dist
     autoDeploy: true
