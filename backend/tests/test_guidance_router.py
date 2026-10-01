@@ -2,14 +2,17 @@
 
 Verifies:
 1. Fast classification of greetings ("hi", "hello", "good morning").
-2. Fast classification of capability inquiries ("what can you do", "what can you tell me", "help").
-3. Fast classification of catalog overview inquiries ("what trials are loaded", "list trials").
-4. Strict clinical safety: Queries mentioning NCT IDs or clinical terms (e.g. brain metastases, washout, ANC)
+2. Fast classification of acknowledgments ("ok", "got it", "thanks").
+3. Fast classification of capability inquiries ("what can you answer?", "what can you do", "help").
+4. Fast classification of catalog overview inquiries ("what trials are loaded", "list trials").
+5. Strict clinical safety: Queries mentioning NCT IDs or clinical terms (e.g. brain metastases, washout, ANC)
    are NEVER classified as guidance and must proceed to protocol retrieval.
-5. Quota exemption: Guidance turns are not counted as clinical screening queries.
-6. History isolation: Guidance responses are filtered out from LLM multi-turn prompts.
+6. Absence of informal emojis across all guidance templates.
+7. Quota exemption: Guidance turns are not counted as clinical screening queries.
+8. History isolation: Guidance responses are filtered out from LLM multi-turn prompts.
 """
 
+import re
 import uuid
 
 import pytest
@@ -47,12 +50,47 @@ def test_classify_greetings(query: str):
 @pytest.mark.parametrize(
     "query",
     [
+        "ok",
+        "Ok",
+        "okay",
+        "OKAY",
+        "alright",
+        "all right",
+        "got it",
+        "understood",
+        "cool",
+        "sure",
+        "fine",
+        "sounds good",
+        "perfect",
+        "noted",
+        "thanks",
+        "thank you",
+        "thx",
+        "thank you so much",
+    ],
+)
+def test_classify_acknowledgments(query: str):
+    """Conversational acknowledgments are recognized accurately."""
+    assert classify_guidance_intent(query) == "acknowledgment"
+    assert is_guidance_intent(query) is True
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
         "what can you do",
         "what can you do?",
         "what can you tell me",
         "what can you tell me ?",
+        "then what can you answer?",
+        "what can you answer?",
+        "what can you answer then",
+        "what else can you answer?",
         "what can i ask",
         "what can i ask you?",
+        "what questions can i ask?",
+        "what kind of questions can i ask",
         "how can you help",
         "how can you help me?",
         "how does this work",
@@ -112,7 +150,7 @@ def test_clinical_queries_bypass_guidance(query: str):
 
 
 def test_build_guidance_response_content():
-    """Guidance response includes manifest counts, capabilities, and exemplary queries."""
+    """Guidance response includes manifest counts, capabilities, and exemplary queries without emojis."""
     manifest = {
         "breast_cancer": 5,
         "lung_cancer": 5,
@@ -124,20 +162,40 @@ def test_build_guidance_response_content():
     assert "Breast Cancer" in response
     assert "Lung Cancer" in response
     assert "Colorectal Cancer" in response
-    assert "Exemplary Queries" in response
+    assert "Exemplary Screening Queries" in response
     assert "checkpoint inhibitor" in response
     assert "brain metastases" in response
     assert "do not count against your 3-query clinical screening quota" in response
 
+    # Rigorous check: strictly zero unicode emoji symbols
+    assert not re.search(r"[\U00010000-\U0010ffff]", response), (
+        "Emojis must not be present in guidance response"
+    )
+
+
+def test_build_acknowledgment_response():
+    """Acknowledgment returns a professional clinical waiting prompt."""
+    response = build_guidance_response("acknowledgment", {})
+    assert "Understood" in response
+    assert "eligibility criteria" in response
+    assert not re.search(r"[\U00010000-\U0010ffff]", response)
+
 
 def test_screening_query_cap_exemption():
-    """Guidance messages do not count towards the 3-query clinical screening session limit."""
+    """Guidance and acknowledgment messages do not count towards the 3-query clinical screening session limit."""
     guidance_user_msg = ChatMessage(
         id=uuid.uuid4(),
         thread_id=uuid.uuid4(),
         role="user",
         content="hello",
         metadata_json={"intent": "greeting"},
+    )
+    ack_user_msg = ChatMessage(
+        id=uuid.uuid4(),
+        thread_id=uuid.uuid4(),
+        role="user",
+        content="ok",
+        metadata_json={"intent": "acknowledgment"},
     )
     clinical_user_msg = ChatMessage(
         id=uuid.uuid4(),
@@ -154,6 +212,7 @@ def test_screening_query_cap_exemption():
     )
 
     assert _is_screening_query(guidance_user_msg) is False
+    assert _is_screening_query(ack_user_msg) is False
     assert _is_screening_query(clinical_user_msg) is True
     assert _is_screening_query(assistant_msg) is False
 

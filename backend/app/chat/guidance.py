@@ -2,13 +2,15 @@
 
 Enforces:
 1. Fast Intent Classification: Deterministically recognizes greetings ("hello"),
-   capability questions ("what can you tell me?"), and catalog inquiries ("what trials are loaded?")
-   in 0ms without hitting vector search, full-text search, or OpenAI LLM APIs.
+   acknowledgments ("ok", "got it"), capability questions ("what can you answer?"),
+   and catalog inquiries ("what trials are loaded?") in 0ms without hitting vector
+   search, full-text search, or OpenAI LLM APIs.
 2. Clinical Safety Preservation: Any query containing an explicit NCT ID or clinical
    oncology parameters (e.g. brain metastases, washout, ANC, EGFR, ECOG) is strictly routed to the
    hybrid retrieval pipeline rather than caught here.
-3. Quota Exemption: Guidance and greeting turns do NOT consume the coordinator's
-   3-query screening session quota (MAX_QUERIES_PER_SESSION).
+3. Quota Exemption: Guidance, greeting, and acknowledgment turns do NOT consume the
+   coordinator's 3-query screening session quota (MAX_QUERIES_PER_SESSION).
+4. Strictly Clinical Tone: Free of informal emojis and casual filler.
 """
 
 from __future__ import annotations
@@ -73,6 +75,17 @@ CLINICAL_INDICATORS = frozenset(
     }
 )
 
+ACKNOWLEDGMENT_PATTERNS = [
+    re.compile(
+        r"^(ok|okay|k|alright|all\s+right|got\s+it|understood|cool|sure|fine|sounds\s+good|perfect|acknowledged|noted)$",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"^(thanks|thank\s+you|thx|many\s+thanks)(\s+(a\s+lot|so\s+much|copilot))?$",
+        re.IGNORECASE,
+    ),
+]
+
 GREETING_PATTERNS = [
     re.compile(r"^hi(\s+(there|copilot|scri|all|team))?$", re.IGNORECASE),
     re.compile(r"^hello(\s+(there|copilot|scri|all|team))?$", re.IGNORECASE),
@@ -85,11 +98,28 @@ GREETING_PATTERNS = [
 
 CAPABILITY_PATTERNS = [
     re.compile(
-        r"^(what|how)\s+(can|do)\s+(you|i)\s+(do|tell(\s+me)?|ask(\s+you)?|know)(\s+about)?$",
+        r"^(then\s+)?what(\s+else)?\s+(can|do|will)\s+you\s+(answer|tell(\s+me)?|do|say|help(\s+with)?).*$",
         re.IGNORECASE,
     ),
     re.compile(
-        r"^what\s+(are\s+your\s+capabilities|can\s+you\s+help(\s+me)?\s+with)$", re.IGNORECASE
+        r"^(then\s+)?what(\s+(else|questions|kind\s+of\s+questions|types\s+of\s+questions))?\s+(can|should|do)\s+i\s+(ask|query|search|enter)(\s+you)?.*$",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"^what\s+(are\s+your\s+capabilities|can\s+you\s+help(\s+me)?\s+with)$",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"^what\s+(kind|types?)\s+of\s+questions\s+can\s+i\s+ask.*$",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"^what\s+questions\s+can\s+(you\s+answer|i\s+ask).*$",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"^what\s+are\s+you\s+able\s+to\s+(do|answer).*$",
+        re.IGNORECASE,
     ),
     re.compile(r"^how\s+can\s+you\s+help(\s+me)?$", re.IGNORECASE),
     re.compile(r"^how\s+does\s+this\s+(work|app|copilot|system)(\s+work)?$", re.IGNORECASE),
@@ -109,17 +139,20 @@ CATALOG_PATTERNS = [
     ),
     re.compile(r"^(what|which)\s+(trials|protocols|studies)\s+do\s+you\s+have$", re.IGNORECASE),
     re.compile(
-        r"^list(\s+all)?\s+(trials|protocols|studies|diseases|cancer\s+types)$", re.IGNORECASE
+        r"^list(\s+all)?\s+(trials|protocols|studies|diseases|cancer\s+types)$",
+        re.IGNORECASE,
     ),
     re.compile(
-        r"^show(\s+all)?\s+(trials|protocols|studies|diseases|active\s+trials)$", re.IGNORECASE
+        r"^show(\s+all)?\s+(trials|protocols|studies|diseases|active\s+trials)$",
+        re.IGNORECASE,
     ),
     re.compile(
         r"^how\s+many\s+(trials|protocols|studies)\s+(are\s+there|are\s+loaded|do\s+you\s+have)$",
         re.IGNORECASE,
     ),
     re.compile(
-        r"^(what\s+is\s+the\s+)?(catalog|corpus)\s*(manifest|coverage|scope)?$", re.IGNORECASE
+        r"^(what\s+is\s+the\s+)?(catalog|corpus)\s*(manifest|coverage|scope)?$",
+        re.IGNORECASE,
     ),
 ]
 
@@ -138,11 +171,12 @@ def _has_clinical_indicators(cleaned_lower: str) -> bool:
 
 
 def classify_guidance_intent(query: str) -> str | None:
-    """Classify user query into guidance/greeting intent if non-clinical.
+    """Classify user query into guidance/greeting/acknowledgment intent if non-clinical.
 
     Returns:
+        - "acknowledgment" for conversational acknowledgments ("ok", "got it", "thanks")
         - "greeting" for greetings ("hello", "hi")
-        - "capabilities" for capability questions ("what can you do", "what can you tell me")
+        - "capabilities" for capability questions ("what can you answer", "what can you do")
         - "catalog" for trial coverage questions ("what trials are loaded", "list trials")
         - None for all actual clinical protocol questions or questions with medical entities.
     """
@@ -157,6 +191,11 @@ def classify_guidance_intent(query: str) -> str | None:
     # Safety Guard 2: Any query containing specific clinical indicators belongs to protocol retrieval
     if _has_clinical_indicators(cleaned.lower()):
         return None
+
+    # Check Acknowledgment patterns
+    for pat in ACKNOWLEDGMENT_PATTERNS:
+        if pat.match(cleaned):
+            return "acknowledgment"
 
     # Check Greeting patterns
     for pat in GREETING_PATTERNS:
@@ -177,7 +216,7 @@ def classify_guidance_intent(query: str) -> str | None:
 
 
 def is_guidance_intent(query: str) -> bool:
-    """Check if query is a greeting, capability query, or catalog overview inquiry."""
+    """Check if query is a greeting, acknowledgment, capability query, or catalog overview inquiry."""
     return classify_guidance_intent(query) is not None
 
 
@@ -193,12 +232,18 @@ def build_guidance_response(
     """Build grounded, comprehensive orientation guidance for coordinators.
 
     Includes:
-    - Welcome and role identity
-    - Primary clinical capabilities (washout, labs, biomarkers, comparison)
+    - Clinical role identity
+    - Primary clinical capabilities (washouts, labs, biomarkers, comparison)
     - Dynamically populated active trial corpus manifest
-    - 4 concrete exemplary queries matching UI cards
+    - 4 concrete exemplary queries formatted with bullet points
     - Grounding notice and session quota exemption indicator
     """
+    if intent == "acknowledgment":
+        return (
+            "Understood. When you are ready, enter your screening inquiry regarding eligibility criteria, "
+            "prior therapy washouts, biomarker requirements, or laboratory thresholds across our active protocols."
+        )
+
     total_trials = sum(corpus_manifest.values()) if corpus_manifest else 0
     if corpus_manifest:
         disease_items = "\n".join(
@@ -209,9 +254,9 @@ def build_guidance_response(
         disease_items = "  - *No clinical trial protocols currently loaded in database.*"
 
     greeting_headline = (
-        "### 👋 Welcome to SCRI Oncology Protocol Copilot"
+        "### Welcome to SCRI Oncology Protocol Copilot"
         if intent == "greeting"
-        else "### ℹ️ SCRI Oncology Protocol Copilot — Capabilities & Guide"
+        else "### SCRI Oncology Protocol Copilot — Capabilities & Clinical Scope"
     )
 
     return (
@@ -220,28 +265,28 @@ def build_guidance_response(
         "**Molecular Tumor Board (MTB) navigators**, and **Principal Investigators** across the Sarah Cannon Research Institute (SCRI) network.\n\n"
         "I provide instant, grounded answers to plain-English questions across active trial protocols to accelerate patient intake.\n\n"
         "---\n\n"
-        "#### 🎯 What You Can Ask Me:\n"
+        "#### Clinical Screening Capabilities:\n"
         "- **Eligibility Criteria:** Check prior therapy washouts, ECOG performance status, and brain metastases stability.\n"
         "- **Biomarker & Genomic Targets:** Confirm required alterations (e.g. *EGFR Exon 20*, *KRAS G12D*, *HER2-low*, *PD-L1*, *BRAF V600E*).\n"
         "- **Laboratory & Organ Function Limits:** Check baseline thresholds for ANC, platelets, total bilirubin, AST/ALT, and creatinine clearance.\n"
         "- **CNS & Brain Metastases Rules:** Review stability windows, stereotactic radiosurgery intervals, and asymptomatic requirements.\n"
         "- **Cross-Trial Comparison:** Compare eligibility criteria across Phase 1, 2, or 3 protocols side-by-side with isolated citations.\n\n"
         "---\n\n"
-        f"#### 📚 Active Trial Corpus Coverage ({total_trials} Protocols Loaded):\n"
+        f"#### Active Trial Corpus Coverage ({total_trials} Protocols Loaded):\n"
         f"{disease_items}\n\n"
         "*(You can also browse the full protocol catalog and inspect source documents under the **Trial Catalog** tab at the top right).*\n\n"
         "---\n\n"
-        "#### 💡 Exemplary Queries to Try:\n"
-        "1. **Prior Immunotherapy Washouts (Lung / Lymphoma):**\n"
-        '   > *"Across our active lymphoma and lung cancer trials, which protocols require a 28-day washout for prior checkpoint inhibitor therapy versus a 14-day or 5 half-life washout?"*\n\n'
-        "2. **Brain Metastases Stability (Colorectal):**\n"
-        '   > *"Which active Phase 2/3 colorectal cancer protocols permit patients with pre-treated, asymptomatic brain metastases, and what is the required MRI stability interval prior to Cycle 1 Day 1?"*\n\n'
-        "3. **Baseline Hematologic Limits (CAR-T / Phase 1):**\n"
-        '   > *"Compare the baseline hematologic thresholds across our active Phase 1 CAR-T studies. Which protocol allows an absolute neutrophil count (ANC) below 1,000/µL or platelets below 75,000/µL?"*\n\n'
-        "4. **Prior Lines of Therapy (Breast / Metastatic):**\n"
-        '   > *"Which breast cancer trials require patients to have received at least 2 prior lines of systemic therapy in the metastatic setting, and which accept first-line refractory patients?"*\n\n'
+        "#### Exemplary Screening Queries:\n"
+        "- **Prior Immunotherapy Washouts (Lung / Lymphoma):**\n"
+        '  > *"Across our active lymphoma and lung cancer trials, which protocols require a 28-day washout for prior checkpoint inhibitor therapy versus a 14-day or 5 half-life washout?"*\n\n'
+        "- **Brain Metastases Stability (Colorectal):**\n"
+        '  > *"Which active Phase 2/3 colorectal cancer protocols permit patients with pre-treated, asymptomatic brain metastases, and what is the required MRI stability interval prior to Cycle 1 Day 1?"*\n\n'
+        "- **Baseline Hematologic Limits (CAR-T / Phase 1):**\n"
+        '  > *"Compare the baseline hematologic thresholds across our active Phase 1 CAR-T studies. Which protocol allows an absolute neutrophil count (ANC) below 1,000/µL or platelets below 75,000/µL?"*\n\n'
+        "- **Prior Lines of Therapy (Breast / Metastatic):**\n"
+        '  > *"Which breast cancer trials require patients to have received at least 2 prior lines of systemic therapy in the metastatic setting, and which accept first-line refractory patients?"*\n\n'
         "---\n\n"
-        "> ℹ️ **Clinical Safety & Grounding Notice:**\n"
+        "> **Clinical Safety & Grounding Notice:**\n"
         "> Every factual assertion in screening answers is backed by exact protocol citations `[NCT ID, Section Header]` linked to source documents.\n"
-        "> *Note: General greetings and capability questions do not count against your 3-query clinical screening quota.*"
+        "> *Note: General greetings, acknowledgments, and capability questions do not count against your 3-query clinical screening quota.*"
     )

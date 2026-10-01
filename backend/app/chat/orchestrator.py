@@ -136,7 +136,7 @@ def _is_refusal_or_unverified(msg: ChatMessage) -> bool:
     if msg.citations:
         return False
     meta = msg.metadata_json or {}
-    if meta.get("intent") in ("greeting", "guidance", "catalog", "capabilities"):
+    if meta.get("intent") in ("greeting", "guidance", "catalog", "capabilities", "acknowledgment"):
         return True
     lowered = msg.content.lower()
     return any(
@@ -159,7 +159,13 @@ def _is_screening_query(msg: ChatMessage) -> bool:
     if msg.role != "user":
         return False
     meta = msg.metadata_json or {}
-    return meta.get("intent") not in ("greeting", "guidance", "catalog", "capabilities")
+    return meta.get("intent") not in (
+        "greeting",
+        "guidance",
+        "catalog",
+        "capabilities",
+        "acknowledgment",
+    )
 
 
 def _trim_history(
@@ -287,7 +293,7 @@ async def stream_chat_turn(
                 user_queries_count,
             )
             session_limit_msg = (
-                "⚠️ **Screening Session Limit Reached (3/3 Queries)**\n\n"
+                "**Screening Session Limit Reached (3/3 Queries)**\n\n"
                 "To guarantee strict protocol grounding, prevent token degradation, and ensure patient safety, "
                 "individual screening sessions are capped at 3 queries.\n\n"
                 "Please click **'New Chat'** in the sidebar to start a fresh screening session for your next inquiry."
