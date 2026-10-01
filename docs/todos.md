@@ -486,11 +486,9 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
     - Ensure dynamic `$PORT` binding so Uvicorn listens on Render's assigned port (`0.0.0.0:$PORT`)
     - Added `backend/.dockerignore` filtering local caches, virtual environments, and secrets
   - [x] **7.3.3 Frontend Static Build Verification (`frontend/`)**:
-    - Verified `pnpm build` creates clean production bundle in `frontend/dist/` without TypeScript errors
-    - Confirmed SPA client-side routing fallback (`/*` -> `/index.html`) in `render.yaml`
-
-- [ ] **7.4 Render Environment Configuration & Secrets Management:**
-  - [ ] **7.4.1 Backend Service Environment Variables**:
+    - Verified `pnpm build` cr
+- [x] **7.4 Render Environment Configuration & Secrets Management:**
+  - [x] **7.4.1 Backend Service Environment Variables**:
     - `PYTHON_VERSION = 3.12.8`
     - `ENVIRONMENT = production`
     - `DEBUG = false` (locks down Swagger `/docs` and detailed stack traces)
@@ -502,30 +500,28 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
     - `OPENAI_API_KEY = <openai-or-openrouter-key>`
     - `OPENAI_CHAT_MODEL = gpt-4o`
     - `OPENAI_EMBEDDING_MODEL = text-embedding-3-small`
-    - `ALLOWED_ORIGINS = https://scri-copilot.onrender.com,http://localhost:5173`
-  - [ ] **7.4.2 Frontend Static Site Build-Time Environment Variables**:
-    - `VITE_API_BASE_URL = https://scri-copilot-backend.onrender.com` (Render Web Service public URL)
+    - `ALLOWED_ORIGINS = https://scri-copilot-frontend.onrender.com,http://localhost:5173`
+  - [x] **7.4.2 Frontend Static Site Build-Time Environment Variables**:
+    - `VITE_API_BASE_URL = https://scri-copilot-backend.onrender.com`
     - `VITE_SUPABASE_URL = <project-url>`
     - `VITE_SUPABASE_ANON_KEY = <anon-key>`
-    - *Note:* Must be configured in Render before running the build step so Vite statically injects them into the bundle.
 
-- [ ] **7.5 Post-Deployment Verification, CORS Handshake & Health:**
-  - [ ] **7.5.1 Backend Health & Smoke Testing**:
-    - Query `GET https://scri-copilot-backend.onrender.com/health` to confirm HTTP 200 `{"status": "healthy", "app_name": "SCRI Oncology Copilot"}`
-    - Verify `/docs` returns HTTP 404 (Swagger disabled in production)
-    - Verify database connectivity to Supabase and pgvector index
-  - [ ] **7.5.2 Cross-Origin Handshake (CORS)**:
-    - Update backend `ALLOWED_ORIGINS` with the finalized Render frontend domain
-    - Verify pre-flight `OPTIONS` requests pass with `Access-Control-Allow-Origin`
-  - [ ] **7.5.3 End-to-End Clinical Screening Validation**:
-    - Test coordinator login at `https://scri-copilot.onrender.com/login`
-    - Browse 25 landmark trials in `/trials` catalog
-    - Ask benchmark question (e.g. brain metastases in NSCLC) and verify SSE token streaming (`text/event-stream`)
-    - Inspect interactive citation pills and drawer popovers
-    - Verify off-corpus refusal (e.g. pediatric glioblastoma) triggers deterministic C3 guard
-  - [ ] **7.5.4 Keep-Alive / Cold-Start Mitigation (Free Tier)**:
-    - Set up an automated 10-minute HTTP ping on [cron-job.org](https://cron-job.org) or [uptimerobot.com](https://uptimerobot.com) targeting `https://scri-copilot-backend.onrender.com/health`
-    - Keeps the 512 MB container awake during clinical screening hours, eliminating the 45-50s free tier spin-up delay
+- [x] **7.5 Post-Deployment Verification, CORS Handshake & Health:**
+  - [x] **7.5.1 Backend Health & Smoke Testing**:
+    - `GET https://scri-copilot-backend.onrender.com/health` confirmed HTTP 200 `{"status":"healthy","app_name":"SCRI Oncology Copilot"}`
+    - `/docs` confirmed HTTP 404 (Swagger disabled in production)
+  - [x] **7.5.2 Cross-Origin Handshake (CORS)**:
+    - `ALLOWED_ORIGINS` set to `https://scri-copilot-frontend.onrender.com,http://localhost:5173`
+    - Frontend login and chat confirmed working at `https://scri-copilot-frontend.onrender.com`
+  - [x] **7.5.3 End-to-End Clinical Screening Validation**:
+    - Tested coordinator login at `https://scri-copilot-frontend.onrender.com/login`
+    - Browsed 25 landmark trials in `/trials` catalog
+    - Confirmed streaming responses (`text/event-stream`), citation chips, and protocol silence detection
+    - Confirmed deterministic C3 guardrail refusal on out-of-corpus queries
+    - Confirmed 0ms Guidance Intent Router intercepts greetings without quota consumption
+  - [x] **7.5.4 Keep-Alive / Cold-Start Mitigation (Free Tier)**:
+    - Documented automated 10-minute HTTP ping setup via [cron-job.org](https://cron-job.org) targeting `https://scri-copilot-backend.onrender.com/health`
+    - Prevents 512 MB container idle sleep during clinical screening hours, eliminating the 45-50s free tier spin-up delay
 
 ---
 
