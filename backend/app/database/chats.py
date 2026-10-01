@@ -10,7 +10,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import case, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -140,7 +140,12 @@ async def list_messages(
         select(ChatMessage)
         .where(ChatMessage.thread_id == tid)
         .options(selectinload(ChatMessage.citations))
-        .order_by(ChatMessage.created_at.asc())
+        .order_by(
+            ChatMessage.created_at.asc(),
+            case(
+                (ChatMessage.role == "user", 0), (ChatMessage.role == "assistant", 1), else_=2
+            ).asc(),
+        )
     )
     result = await session.execute(stmt)
     return list(result.scalars().all())
@@ -169,7 +174,9 @@ async def persist_turn(
         content=assistant_content,
         metadata_json=assistant_metadata,
     )
-    session.add_all([user_msg, assistant_msg])
+    session.add(user_msg)
+    await session.flush()
+    session.add(assistant_msg)
     await session.flush()
 
     if citations:

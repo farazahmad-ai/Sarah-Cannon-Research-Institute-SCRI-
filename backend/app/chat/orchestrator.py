@@ -62,6 +62,33 @@ MAX_HISTORY_TOKENS: int = 8_000
 
 NCT_PATTERN = re.compile(r"\bNCT\d{8}\b", re.IGNORECASE)
 
+DISEASE_KEYWORDS: dict[str, list[str]] = {
+    "breast_cancer": [
+        "breast cancer",
+        "tnbc",
+        "triple-negative",
+        "her2-positive breast",
+        "her2-low breast",
+        "er+/her2-",
+        "mbc",
+    ],
+    "colorectal_cancer": ["colorectal", "colon cancer", "rectal cancer", "mcrc", "crc"],
+    "non_small_cell_lung_cancer": ["lung cancer", "nsclc", "non-small cell lung"],
+    "melanoma": ["melanoma"],
+    "lymphoma_car_t": ["lymphoma", "car-t", "cart", "dlbcl", "non-hodgkin"],
+}
+
+
+def _detect_single_disease_category(message: str) -> str | None:
+    """Detect if the coordinator's question specifically and uniquely targets a single cancer category."""
+    lowered = message.lower()
+    matched = [
+        cat for cat, kw_list in DISEASE_KEYWORDS.items() if any(kw in lowered for kw in kw_list)
+    ]
+    if len(matched) == 1:
+        return matched[0]
+    return None
+
 
 def build_retrieval_query(message: str, history: list[ChatMessage]) -> str:
     """Anchor follow-up retrieval queries to active clinical trials.
@@ -365,9 +392,19 @@ async def stream_chat_turn(
                         passages.append(p)
         else:
             # Global corpus retrieval: broad disease or exploratory query
+            # If the coordinator specifically asks about a single disease indication, scope retrieval strictly to that category
+            matched_category = _detect_single_disease_category(request.message)
+            if matched_category:
+                logger.info(
+                    "Disease-scoped retrieval for thread %s [category=%s]: '%s'",
+                    thread_id,
+                    matched_category,
+                    request.message,
+                )
             passages = await retrieve_protocols(
                 pre_session,
                 request.message,
+                disease_category=matched_category,
                 limit=DEFAULT_LIMIT,
                 min_similarity=DEFAULT_MIN_SIMILARITY,
             )
@@ -486,10 +523,12 @@ async def stream_chat_turn(
         prompt_with_instructions = (
             f"{context_block}\n\n"
             f"User Question: {request.message}\n\n"
-            "[MANDATORY CITATION & NUMERICAL PRECISION INSTRUCTIONS:\n"
+            "[MANDATORY CITATION & CLINICAL SAFETY INSTRUCTIONS:\n"
             "1. Every single factual criterion, washout duration, or threshold must cite its exact supporting protocol passage using [NCT ID, Section Header] from the Protocol Context above.\n"
-            "2. Report NUMERICAL TIMEFRAMES EXACTLY as written in the passage (e.g., '1 week', '4 weeks', '14 days'). NEVER average, combine, round, or extrapolate numbers between different criteria.\n"
-            "3. If multiple criteria are asked about or retrieved (e.g., surgery and radiation), state each one separately under its own bullet point with its own individual citation matching the exact passage header.]"
+            "2. FORMAT CITATIONS WITH LITERAL BRACKETS: Citations must always be enclosed in literal square brackets, e.g. [NCT07340541, Study Design & Objectives]. Plain text citations without brackets will fail grounding verification.\n"
+            "3. Report NUMERICAL TIMEFRAMES EXACTLY as written in the passage (e.g., '1 week', '4 weeks', '14 days'). NEVER average, combine, round, or extrapolate numbers between different criteria.\n"
+            "4. STRICT DISEASE ISOLATION: If the question asks about a specific disease (e.g., breast cancer), ONLY use and cite passages from trials investigating that disease. NEVER borrow criteria from another cancer (e.g., NSCLC) or claim that concepts are similar. If the protocols for that disease do not state a criterion, declare protocol silence.\n"
+            "5. If multiple criteria are asked about or retrieved (e.g., prior lines and refractory status), state each one separately under its own bullet point with its own individual citation matching the exact passage header.]"
         )
 
         async with oncology_agent.run_stream(

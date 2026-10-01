@@ -59,6 +59,17 @@ const EXEMPLARY_QUERIES = [
   },
 ];
 
+function sortHistory<T extends { role: string; created_at: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => {
+    const tA = new Date(a.created_at).getTime();
+    const tB = new Date(b.created_at).getTime();
+    if (tA !== tB) return tA - tB;
+    if (a.role === "user" && b.role === "assistant") return -1;
+    if (a.role === "assistant" && b.role === "user") return 1;
+    return 0;
+  });
+}
+
 export function ChatContainer({
   threadId,
   onThreadCreated,
@@ -92,7 +103,8 @@ export function ChatContainer({
   const handleStreamComplete = useCallback(async (completedThreadId: string) => {
     try {
       // Reload history to retrieve verified citations and DB message IDs saved by backend
-      const history = await api.chat.messages(completedThreadId);
+      const rawHistory = await api.chat.messages(completedThreadId);
+      const history = sortHistory(rawHistory);
       const cMap = new Map<string, CitationOut[]>();
       const cIndexMap = new Map<number, CitationOut[]>();
       let aIdx = 0;
@@ -180,7 +192,8 @@ export function ChatContainer({
       try {
         setHistoryLoading(true);
         setErrorMsg(null);
-        const history = await api.chat.messages(threadId!);
+        const rawHistory = await api.chat.messages(threadId!);
+        const history = sortHistory(rawHistory);
 
         if (isMounted) {
           // Build citation lookup

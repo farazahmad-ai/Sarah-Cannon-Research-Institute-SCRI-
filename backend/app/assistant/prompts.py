@@ -72,7 +72,11 @@ SYSTEM_PROMPT = (
     "numbers between different criteria.\n"
     "11. INDIVIDUAL BRACKET CITATIONS: Each criterion must have its own distinct bracket citation matching the EXACT "
     "passage header where that criterion appears (e.g. [NCT07659782, Eligibility: Exclusion Criterion #3]). "
-    "NEVER combine multiple numbers or headers into a single bracket, and NEVER reuse a citation from an earlier conversation turn."
+    "NEVER combine multiple numbers or headers into a single bracket, and NEVER reuse a citation from an earlier conversation turn.\n"
+    "12. STRICT INDICATION ISOLATION: When a question specifies a cancer type (e.g., 'breast cancer'), you must ONLY answer "
+    "using protocol passages that investigate that exact disease. You are FORBIDDEN from borrowing criteria from unrelated cancers "
+    "(e.g., citing an NSCLC trial for a breast cancer question) or claiming that concepts are similar. If the protocols for that disease "
+    "do not state a criterion, declare protocol silence ('The breast cancer protocols do not state [X]'). Never extrapolate across cancer types."
 )
 
 # Directive injected into the system context when retrieval returns zero passages.
@@ -112,9 +116,7 @@ def format_corpus_manifest(category_counts: dict[str, int]) -> str:
     lines = [f"Corpus Manifest: this system contains {total} clinical trial protocol(s):"]
     for category in sorted(category_counts):
         lines.append(f"  - {category.replace('_', ' ')}: {category_counts[category]} trial(s)")
-    lines.append(
-        "Topics outside these disease areas are NOT in this system and must be refused."
-    )
+    lines.append("Topics outside these disease areas are NOT in this system and must be refused.")
     return "\n".join(lines)
 
 
@@ -132,9 +134,7 @@ def build_no_evidence_refusal(query: str, category_counts: dict[str, int]) -> st
     if category_counts:
         total = sum(category_counts.values())
         areas = ", ".join(c.replace("_", " ") for c in sorted(category_counts))
-        scope = (
-            f"This system currently contains {total} active trial protocols covering: {areas}. "
-        )
+        scope = f"This system currently contains {total} active trial protocols covering: {areas}. "
     else:
         scope = "This system currently has no trial protocols loaded. "
 
