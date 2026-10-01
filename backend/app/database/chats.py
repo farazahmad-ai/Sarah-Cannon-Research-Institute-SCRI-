@@ -8,8 +8,9 @@ Enforces:
 
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import case, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -30,7 +31,7 @@ async def upsert_profile(
     email: str,
 ) -> None:
     """Ensure a profile record exists for the authenticated user.
-    
+
     Prevents foreign key violations when creating chat threads for newly
     signed-in users whose profiles have not yet been explicitly seeded.
     Handles existing records safely to avoid unique constraint collisions.
@@ -78,9 +79,7 @@ async def list_threads(
     """Return all chat threads belonging to the user, newest first."""
     uid = _normalize_uuid(user_id)
     stmt = (
-        select(ChatThread)
-        .where(ChatThread.user_id == uid)
-        .order_by(ChatThread.created_at.desc())
+        select(ChatThread).where(ChatThread.user_id == uid).order_by(ChatThread.created_at.desc())
     )
     result = await session.execute(stmt)
     return list(result.scalars().all())
@@ -92,7 +91,7 @@ async def get_thread(
     user_id: uuid.UUID | str,
 ) -> ChatThread:
     """Retrieve a single thread with strict ownership enforcement.
-    
+
     Raises:
         ValueError: If thread does not exist.
         PermissionError: If thread belongs to another user (tenancy violation).
@@ -141,7 +140,12 @@ async def list_messages(
         select(ChatMessage)
         .where(ChatMessage.thread_id == tid)
         .options(selectinload(ChatMessage.citations))
-        .order_by(ChatMessage.created_at.asc())
+        .order_by(
+            ChatMessage.created_at.asc(),
+            case(
+                (ChatMessage.role == "user", 0), (ChatMessage.role == "assistant", 1), else_=2
+            ).asc(),
+        )
     )
     result = await session.execute(stmt)
     return list(result.scalars().all())
@@ -153,6 +157,8 @@ async def persist_turn(
     user_content: str,
     assistant_content: str,
     citations: list[MessageCitationCreate] | None = None,
+    user_metadata: dict[str, Any] | None = None,
+    assistant_metadata: dict[str, Any] | None = None,
 ) -> tuple[ChatMessage, ChatMessage]:
     """Persist user query, assistant response, and verified citations in a single transaction."""
     tid = _normalize_uuid(thread_id)
@@ -160,13 +166,17 @@ async def persist_turn(
         thread_id=tid,
         role="user",
         content=user_content,
+        metadata_json=user_metadata,
     )
     assistant_msg = ChatMessage(
         thread_id=tid,
         role="assistant",
         content=assistant_content,
+        metadata_json=assistant_metadata,
     )
-    session.add_all([user_msg, assistant_msg])
+    session.add(user_msg)
+    await session.flush()
+    session.add(assistant_msg)
     await session.flush()
 
     if citations:
@@ -230,5 +240,3 @@ async def record_message_feedback(
     await session.flush()
     await session.refresh(message, attribute_names=["citations"])
     return message
-
-

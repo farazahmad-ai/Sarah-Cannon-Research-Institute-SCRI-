@@ -24,6 +24,10 @@ from app.assistant.prompts import (
 )
 from app.assistant.schemas import ChatRequest, ProtocolPassage
 from app.auth.jwt import AuthenticatedUser
+from app.chat.guidance import (
+    build_guidance_response,
+    classify_guidance_intent,
+)
 from app.database.chats import (
     create_thread,
     get_thread,
@@ -57,6 +61,33 @@ MAX_HISTORY_TURNS: int = 2
 MAX_HISTORY_TOKENS: int = 8_000
 
 NCT_PATTERN = re.compile(r"\bNCT\d{8}\b", re.IGNORECASE)
+
+DISEASE_KEYWORDS: dict[str, list[str]] = {
+    "breast_cancer": [
+        "breast cancer",
+        "tnbc",
+        "triple-negative",
+        "her2-positive breast",
+        "her2-low breast",
+        "er+/her2-",
+        "mbc",
+    ],
+    "colorectal_cancer": ["colorectal", "colon cancer", "rectal cancer", "mcrc", "crc"],
+    "non_small_cell_lung_cancer": ["lung cancer", "nsclc", "non-small cell lung"],
+    "melanoma": ["melanoma"],
+    "lymphoma_car_t": ["lymphoma", "car-t", "cart", "dlbcl", "non-hodgkin"],
+}
+
+
+def _detect_single_disease_category(message: str) -> str | None:
+    """Detect if the coordinator's question specifically and uniquely targets a single cancer category."""
+    lowered = message.lower()
+    matched = [
+        cat for cat, kw_list in DISEASE_KEYWORDS.items() if any(kw in lowered for kw in kw_list)
+    ]
+    if len(matched) == 1:
+        return matched[0]
+    return None
 
 
 def build_retrieval_query(message: str, history: list[ChatMessage]) -> str:
@@ -100,10 +131,16 @@ def extract_target_nct_ids(message: str, history: list[ChatMessage]) -> list[str
 
     # Priority 1: Check verified citations from recent assistant messages
     for m in reversed(history):
-        if m.role == "assistant" and getattr(m, "citations", None) and not _is_refusal_or_unverified(m):
+        if (
+            m.role == "assistant"
+            and getattr(m, "citations", None)
+            and not _is_refusal_or_unverified(m)
+        ):
             anchors: list[str] = []
             for c in m.citations:
-                nct = getattr(c, "nct_id", None) or (c.get("nct_id") if isinstance(c, dict) else None)
+                nct = getattr(c, "nct_id", None) or (
+                    c.get("nct_id") if isinstance(c, dict) else None
+                )
                 if nct and nct.upper() not in anchors:
                     anchors.append(nct.upper())
             if anchors:
@@ -118,8 +155,6 @@ def extract_target_nct_ids(message: str, history: list[ChatMessage]) -> list[str
     return []
 
 
-
-
 def _is_refusal_or_unverified(msg: ChatMessage) -> bool:
     """Check if an assistant message was a refusal or unverified turn that should not poison LLM context."""
     if msg.role != "assistant":
@@ -127,6 +162,9 @@ def _is_refusal_or_unverified(msg: ChatMessage) -> bool:
     # If the message has verified protocol citations, it is grounded clinical context
     if msg.citations:
         return False
+    meta = msg.metadata_json or {}
+    if meta.get("intent") in ("greeting", "guidance", "catalog", "capabilities", "acknowledgment"):
+        return True
     lowered = msg.content.lower()
     return any(
         marker in lowered
@@ -140,6 +178,20 @@ def _is_refusal_or_unverified(msg: ChatMessage) -> bool:
             "no protocol passage could be verified",
             "evidence notice",
         )
+    )
+
+
+def _is_screening_query(msg: ChatMessage) -> bool:
+    """Check if a user message is an actual clinical screening query subject to session limits."""
+    if msg.role != "user":
+        return False
+    meta = msg.metadata_json or {}
+    return meta.get("intent") not in (
+        "greeting",
+        "guidance",
+        "catalog",
+        "capabilities",
+        "acknowledgment",
     )
 
 
@@ -209,16 +261,12 @@ async def stream_chat_turn(
             thread_id = thread.id
             if thread.title in ("New Screening Session", "New session", ""):
                 thread.title = (
-                    request.message[:45] + "..."
-                    if len(request.message) > 45
-                    else request.message
+                    request.message[:45] + "..." if len(request.message) > 45 else request.message
                 )
                 await pre_session.flush()
         else:
             initial_title = (
-                request.message[:45] + "..."
-                if len(request.message) > 45
-                else request.message
+                request.message[:45] + "..." if len(request.message) > 45 else request.message
             )
             thread = await create_thread(pre_session, user_uuid, title=initial_title)
             thread_id = thread.id
@@ -227,8 +275,44 @@ async def stream_chat_turn(
         full_history = await list_messages(pre_session, thread_id, user_uuid)
         history = _trim_history(full_history)
 
+        # 3a. Fast Guidance & Greeting Intent Router (0ms / 0 tokens / Quota-exempt)
+        guidance_intent = classify_guidance_intent(request.message)
+        if guidance_intent:
+            logger.info(
+                "Guidance intent detected for thread %s [intent=%s]: '%s'",
+                thread_id,
+                guidance_intent,
+                request.message,
+            )
+            corpus_manifest = await get_corpus_manifest(pre_session)
+            await pre_session.commit()
+
+            guidance_msg = build_guidance_response(guidance_intent, corpus_manifest)
+            yield f"0:{json.dumps(guidance_msg)}\n"
+            yield 'd:{"finishReason":"stop"}\n'
+
+            try:
+                async with async_session_factory() as post_session:
+                    await persist_turn(
+                        post_session,
+                        thread_id,
+                        request.message,
+                        guidance_msg,
+                        citations=[],
+                        user_metadata={"intent": guidance_intent},
+                        assistant_metadata={"intent": "guidance", "grounded": True},
+                    )
+                    await post_session.commit()
+            except BaseException as exc:
+                logger.error(
+                    "Failed to persist guidance turn for thread %s: %s",
+                    thread_id,
+                    exc,
+                )
+            return
+
         # 3b. Session query cap: prevent context decay, token bloat, and attention loss
-        user_queries_count = sum(1 for m in full_history if m.role == "user")
+        user_queries_count = sum(1 for m in full_history if _is_screening_query(m))
         if user_queries_count >= MAX_QUERIES_PER_SESSION:
             logger.info(
                 "Session limit reached for thread %s (%d queries)",
@@ -236,7 +320,7 @@ async def stream_chat_turn(
                 user_queries_count,
             )
             session_limit_msg = (
-                "⚠️ **Screening Session Limit Reached (3/3 Queries)**\n\n"
+                "**Screening Session Limit Reached (3/3 Queries)**\n\n"
                 "To guarantee strict protocol grounding, prevent token degradation, and ensure patient safety, "
                 "individual screening sessions are capped at 3 queries.\n\n"
                 "Please click **'New Chat'** in the sidebar to start a fresh screening session for your next inquiry."
@@ -255,7 +339,9 @@ async def stream_chat_turn(
                     )
                     await post_session.commit()
             except BaseException as exc:
-                logger.error("Failed to persist session limit turn for thread %s: %s", thread_id, exc)
+                logger.error(
+                    "Failed to persist session limit turn for thread %s: %s", thread_id, exc
+                )
             return
 
         # 4. Retrieve candidate protocol passages via targeted or partitioned hybrid retrieval
@@ -306,9 +392,19 @@ async def stream_chat_turn(
                         passages.append(p)
         else:
             # Global corpus retrieval: broad disease or exploratory query
+            # If the coordinator specifically asks about a single disease indication, scope retrieval strictly to that category
+            matched_category = _detect_single_disease_category(request.message)
+            if matched_category:
+                logger.info(
+                    "Disease-scoped retrieval for thread %s [category=%s]: '%s'",
+                    thread_id,
+                    matched_category,
+                    request.message,
+                )
             passages = await retrieve_protocols(
                 pre_session,
                 request.message,
+                disease_category=matched_category,
                 limit=DEFAULT_LIMIT,
                 min_similarity=DEFAULT_MIN_SIMILARITY,
             )
@@ -360,7 +456,14 @@ async def stream_chat_turn(
     # Only inject corpus manifest if user is asking about overall catalog coverage
     is_coverage_query = any(
         k in request.message.lower()
-        for k in ("what trials", "which trials", "list trials", "what diseases", "coverage", "how many trials")
+        for k in (
+            "what trials",
+            "which trials",
+            "list trials",
+            "what diseases",
+            "coverage",
+            "how many trials",
+        )
     )
     manifest_for_prompt = corpus_manifest if (is_coverage_query or not passages) else {}
 
@@ -420,10 +523,12 @@ async def stream_chat_turn(
         prompt_with_instructions = (
             f"{context_block}\n\n"
             f"User Question: {request.message}\n\n"
-            "[MANDATORY CITATION & NUMERICAL PRECISION INSTRUCTIONS:\n"
+            "[MANDATORY CITATION & CLINICAL SAFETY INSTRUCTIONS:\n"
             "1. Every single factual criterion, washout duration, or threshold must cite its exact supporting protocol passage using [NCT ID, Section Header] from the Protocol Context above.\n"
-            "2. Report NUMERICAL TIMEFRAMES EXACTLY as written in the passage (e.g., '1 week', '4 weeks', '14 days'). NEVER average, combine, round, or extrapolate numbers between different criteria.\n"
-            "3. If multiple criteria are asked about or retrieved (e.g., surgery and radiation), state each one separately under its own bullet point with its own individual citation matching the exact passage header.]"
+            "2. FORMAT CITATIONS WITH LITERAL BRACKETS: Citations must always be enclosed in literal square brackets, e.g. [NCT07340541, Study Design & Objectives]. Plain text citations without brackets will fail grounding verification.\n"
+            "3. Report NUMERICAL TIMEFRAMES EXACTLY as written in the passage (e.g., '1 week', '4 weeks', '14 days'). NEVER average, combine, round, or extrapolate numbers between different criteria.\n"
+            "4. STRICT DISEASE ISOLATION: If the question asks about a specific disease (e.g., breast cancer), ONLY use and cite passages from trials investigating that disease. NEVER borrow criteria from another cancer (e.g., NSCLC) or claim that concepts are similar. If the protocols for that disease do not state a criterion, declare protocol silence.\n"
+            "5. If multiple criteria are asked about or retrieved (e.g., prior lines and refractory status), state each one separately under its own bullet point with its own individual citation matching the exact passage header.]"
         )
 
         async with oncology_agent.run_stream(
