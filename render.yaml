@@ -1,0 +1,81 @@
+# ==============================================================================
+# Render Blueprint — Sarah Cannon Research Institute (SCRI) Oncology Copilot
+# Single-click Infrastructure-as-Code orchestrating Backend Web Service & Frontend Static Site.
+# ==============================================================================
+
+services:
+  # --------------------------------------------------------------------------
+  # 1. Backend Web Service: FastAPI + PydanticAI + pgvector Hybrid RAG
+  # --------------------------------------------------------------------------
+  - type: web
+    name: scri-copilot-backend
+    runtime: python
+    rootDir: backend
+    plan: free
+    region: oregon
+    buildCommand: uv sync --frozen --no-dev
+    startCommand: uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: HOST
+        value: 0.0.0.0
+      - key: OPENAI_CHAT_MODEL
+        value: gpt-4o
+      - key: OPENAI_EMBEDDING_MODEL
+        value: text-embedding-3-small
+      - key: OPENAI_EMBEDDING_DIMENSIONS
+        value: "1536"
+      - key: ALLOWED_ORIGINS
+        value: https://scri-copilot-frontend.onrender.com,http://localhost:5173
+      # Sensitive secrets prompted during initial Blueprint setup (sync: false)
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+
+  # --------------------------------------------------------------------------
+  # 2. Frontend Static Site: Vite + React 18 + TypeScript SPA
+  # --------------------------------------------------------------------------
+  - type: static
+    name: scri-copilot-frontend
+    rootDir: frontend
+    plan: free
+    buildCommand: pnpm install && pnpm build
+    staticPublishPath: dist
+    autoDeploy: true
+    routes:
+      # Client-side SPA routing fallback (prevents 404 on /chat, /trials, /history refresh)
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+    envVars:
+      # Static sites require build-time environment variables injected into the bundle
+      - key: VITE_API_BASE_URL
+        value: https://scri-copilot-backend.onrender.com
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false

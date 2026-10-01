@@ -462,31 +462,32 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
     - Replaced `print()` calls in lifespan with `logging.getLogger(__name__).info()`
     - No longer logs the full `ALLOWED_ORIGINS` list or model names — logs only origin count and environment
 
-- [ ] **7.3 Render Deployment — Infrastructure as Code & Container Assets:**
-  - [ ] **7.3.1 Render Blueprint (`render.yaml`)**:
+- [x] **7.3 Render Deployment — Infrastructure as Code & Container Assets:**
+  - [x] **7.3.1 Render Blueprint (`render.yaml`)**:
     - Infrastructure-as-code specification in repository root orchestrating both services in one click
     - Define Backend Web Service (`scri-copilot-backend`):
-      - Runtime: `docker` or `python` (Python 3.12)
+      - Runtime: `python` (Python 3.12 via `uv sync --frozen --no-dev`)
       - Root directory: `backend`
       - Plan: `free` (512 MB RAM / 0.1 vCPU)
-      - Build command: `pip install --upgrade pip && pip install uv && uv sync --no-dev`
+      - Build command: `uv sync --frozen --no-dev`
       - Start command: `uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT`
       - Health check path: `/health`
     - Define Frontend Static Site (`scri-copilot-frontend`):
       - Runtime: `static`
       - Root directory: `frontend`
       - Plan: `free` (Global edge CDN, 0s spin-down)
-      - Build command: `npm install -g pnpm && pnpm install && pnpm build`
+      - Build command: `pnpm install && pnpm build`
       - Publish directory: `dist`
       - SPA rewrite routes: `/*` -> `/index.html` (prevents 404 on direct navigation to `/chat` or `/trials`)
-  - [ ] **7.3.2 Backend Containerization (`backend/Dockerfile`)**:
-    - Multi-stage or slim Python 3.12 image (`python:3.12-slim`)
+  - [x] **7.3.2 Backend Containerization (`backend/Dockerfile`)**:
+    - Multi-stage slim Python 3.12 image (`python:3.12-slim-bookworm`)
     - Install `uv` binary via `ghcr.io/astral-sh/uv:latest`
     - Copy `pyproject.toml` and `uv.lock` for deterministic, frozen dependency installation
     - Ensure dynamic `$PORT` binding so Uvicorn listens on Render's assigned port (`0.0.0.0:$PORT`)
-  - [ ] **7.3.3 Frontend Static Build Verification (`frontend/`)**:
-    - Verify `pnpm build` creates clean production bundle in `frontend/dist/` without TypeScript or lint warnings
-    - Ensure SPA client-side routing fallback (`/*` -> `/index.html`) is active in Render
+    - Added `backend/.dockerignore` filtering local caches, virtual environments, and secrets
+  - [x] **7.3.3 Frontend Static Build Verification (`frontend/`)**:
+    - Verified `pnpm build` creates clean production bundle in `frontend/dist/` without TypeScript errors
+    - Confirmed SPA client-side routing fallback (`/*` -> `/index.html`) in `render.yaml`
 
 - [ ] **7.4 Render Environment Configuration & Secrets Management:**
   - [ ] **7.4.1 Backend Service Environment Variables**:

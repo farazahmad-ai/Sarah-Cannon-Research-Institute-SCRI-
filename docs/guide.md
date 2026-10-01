@@ -27,6 +27,12 @@ This guide compiles and adapts the end-to-end setup instructions for **SCRI Onco
    - [Backend `.env`](#backend-env)
    - [Frontend `.env`](#frontend-env)
 6. [Full Local Development Flow (Verification)](#5-full-local-development-flow)
+7. [Cloud Deployment on Render (Production Blueprint)](#6-cloud-deployment-on-render-production-blueprint)
+   - [7.1 Render Infrastructure Overview](#71-render-infrastructure-overview)
+   - [7.2 One-Click Blueprint Deployment](#72-one-click-blueprint-deployment)
+   - [7.3 Domain Alignment & CORS Configuration](#73-domain-alignment--cors-configuration)
+   - [7.4 Post-Deployment Health Check & Verification](#74-post-deployment-health-check--verification)
+   - [7.5 Free-Tier Cold-Start Mitigation](#75-free-tier-cold-start-mitigation)
 
 ---
 
@@ -404,3 +410,107 @@ pnpm dev
 ```
 
 You can now open `http://localhost:5173` in your browser to sign in and interact with the SCRI Oncology Copilot.
+
+---
+
+## 6. Cloud Deployment on Render (Production Blueprint)
+
+This section provides the end-to-end instructions for deploying **SCRI Oncology Copilot** on [Render](https://render.com) using the Infrastructure-as-Code Blueprint ([`render.yaml`](file:///d:/FarazAhmad-ai/projects/Sarah%20Cannon%20Research%20Institute%20%28SCRI%29/render.yaml)).
+
+### 7.1 Render Infrastructure Overview
+
+The deployment provisions two managed services on Render's free tier:
+
+1. **Backend Web Service (`scri-copilot-backend`)**:
+   - **Runtime:** Python 3.12 managed via `uv` (fast binary package installer).
+   - **Server:** Uvicorn ASGI server binding dynamically to `$PORT`.
+   - **Health Monitor:** Automatic HTTP health checks at `/health`.
+   - **Container Alternative:** A multi-stage [`backend/Dockerfile`](file:///d:/FarazAhmad-ai/projects/Sarah%20Cannon%20Research%20Institute%20%28SCRI%29/backend/Dockerfile) is also included for Docker-based deployments.
+2. **Frontend Static Site (`scri-copilot-frontend`)**:
+   - **Runtime:** Global Edge CDN serving the pre-built React/Vite SPA bundle.
+   - **Build Process:** `pnpm install && pnpm build` inside the `frontend/` directory.
+   - **Routing:** Built-in SPA rewrite rule (`/*` -> `/index.html`) ensuring page refreshes on `/chat` or `/trials` do not result in HTTP 404 errors.
+
+### 7.2 One-Click Blueprint Deployment
+
+Follow these steps to launch the application:
+
+1. **Push to GitHub:**
+   Ensure the `render.yaml`, `backend/Dockerfile`, and `backend/.dockerignore` files are committed and pushed to your GitHub repository.
+
+2. **Sign In to Render:**
+   - Navigate to [dashboard.render.com](https://dashboard.render.com).
+   - Sign up or log in using your GitHub account (this grants Render read access to your repositories).
+
+3. **Create New Blueprint:**
+   - In the Render Dashboard header, click **New +** and select **Blueprint**.
+   - Connect your GitHub repository: `farazahmad-ai/Sarah-Cannon-Research-Institute-SCRI-`.
+   - Select the branch you want to deploy (e.g., `main` or your deployment branch).
+   - Render will parse [`render.yaml`](file:///d:/FarazAhmad-ai/projects/Sarah%20Cannon%20Research%20Institute%20%28SCRI%29/render.yaml) and automatically configure both services.
+
+4. **Input Environment Secrets:**
+   During the Blueprint setup, Render will prompt you for the secrets configured with `sync: false`. Paste the values from your working local `.env` files:
+
+   | Variable Name | Target Service | Value Source | Description |
+   | :--- | :--- | :--- | :--- |
+   | `SUPABASE_URL` | Backend | `backend/.env` | Supabase project URL (`https://<ref>.supabase.co`) |
+   | `SUPABASE_ANON_KEY` | Backend | `backend/.env` | Supabase publishable anon key |
+   | `SUPABASE_SERVICE_ROLE_KEY` | Backend | `backend/.env` | Supabase administrative service role secret key |
+   | `DATABASE_URL` | Backend | `backend/.env` | Direct PostgreSQL session connection (`port 5432`) |
+   | `OPENAI_API_KEY` | Backend | `backend/.env` | OpenAI API key or OpenRouter API key |
+   | `VITE_SUPABASE_URL` | Frontend | `frontend/.env` | Same as `SUPABASE_URL` |
+   | `VITE_SUPABASE_ANON_KEY` | Frontend | `frontend/.env` | Same as `SUPABASE_ANON_KEY` |
+
+5. **Deploy:**
+   Click **Apply**. Render will trigger parallel build jobs for both the backend and frontend.
+
+### 7.3 Domain Alignment & CORS Configuration
+
+Once Render assigns public URLs to both services:
+
+1. **Identify Assigned URLs:**
+   - Backend URL: e.g., `https://scri-copilot-backend.onrender.com`
+   - Frontend URL: e.g., `https://scri-copilot-frontend.onrender.com`
+
+2. **Verify Cross-Origin Settings:**
+   - If your assigned frontend domain differs from the default in `render.yaml`, go to **Dashboard ➔ scri-copilot-backend ➔ Environment** and update:
+     ```env
+     ALLOWED_ORIGINS=https://<your-actual-frontend-url>.onrender.com,http://localhost:5173
+     ```
+   - If your assigned backend domain differs, go to **Dashboard ➔ scri-copilot-frontend ➔ Environment**, update `VITE_API_BASE_URL=https://<your-actual-backend-url>.onrender.com`, and click **Manual Deploy ➔ Clear build cache & deploy** to re-bake the URL into the frontend static bundle.
+
+### 7.4 Post-Deployment Health Check & Verification
+
+Once deployments finish (green "Live" badge):
+
+1. **Verify Backend Health:**
+   Open a browser or terminal and request the health endpoint:
+   ```bash
+   curl -i https://scri-copilot-backend.onrender.com/health
+   ```
+   Expected response:
+   ```json
+   HTTP/2 200
+   {"status":"healthy","app_name":"SCRI Oncology Copilot"}
+   ```
+
+2. **Verify Security Lockdown:**
+   Visit `https://scri-copilot-backend.onrender.com/docs`.
+   Expected response: HTTP 404 Not Found (OpenAPI documentation is securely disabled when `DEBUG=false`).
+
+3. **Verify Frontend Application:**
+   - Open your frontend URL in the browser.
+   - Sign in using institutional credentials.
+   - Submit a clinical screening query (e.g., *"Which breast cancer trials allow prior T-DXd?"*).
+   - Confirm token streaming, bracketed protocol citations, and drawer verification.
+
+### 7.5 Free-Tier Cold-Start Mitigation
+
+Render spins down free-tier Web Services after 15 minutes of inactivity. When a coordinator visits the application after an idle period, the first request experiences a 40–50 second container spin-up delay.
+
+**Recommended Free Mitigation:**
+1. Create a free account on [cron-job.org](https://cron-job.org) or [uptimerobot.com](https://uptimerobot.com).
+2. Configure an automated HTTP GET ping running every **10 minutes**:
+   - **Target URL:** `https://scri-copilot-backend.onrender.com/health`
+   - **Method:** `GET`
+3. This keeps the backend warm during clinical screening hours without incurring hosting costs.
