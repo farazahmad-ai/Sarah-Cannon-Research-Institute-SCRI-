@@ -44,18 +44,18 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
 
 ## Phase 2: Database Foundation & Schema Migrations (in `backend/`)
 
-- [ ] **2.1 Backend Scaffolding & Packaging Setup:**
+- [x] **2.1 Backend Scaffolding & Packaging Setup:**
   - [x] Configure `backend/pyproject.toml` with project name `scri-copilot-backend`, Hatchling build system, and dependencies
   - [x] Create `backend/app/__init__.py` (Root application package)
-  - [ ] Scaffold internal module directories and empty `__init__.py` files:
+  - [x] Scaffold internal module directories and empty `__init__.py` files:
     - [x] `backend/app/api/` (FastAPI route handlers)
-    - [ ] `backend/app/assistant/` (PydanticAI agent, prompts, and dependencies)
+    - [x] `backend/app/assistant/` (PydanticAI agent, prompts, and dependencies)
     - [x] `backend/app/auth/` (Supabase JWT verification)
-    - [ ] `backend/app/chat/` (Chat turn orchestration & streaming)
-    - `backend/app/grounding/` (Citation and grounding validator)
-    - `backend/app/ingest/` (Chunking and trial ingestion pipeline)
-    - `backend/app/retrieval/` (pgvector, full-text search, and RRF fusion)
-    - `backend/tests/` (Pytest test suite)
+    - [x] `backend/app/chat/` (Chat turn orchestration & streaming)
+    - [x] `backend/app/grounding/` (Citation and grounding validator)
+    - [x] `backend/app/ingest/` (Chunking and trial ingestion pipeline)
+    - [x] `backend/app/retrieval/` (pgvector, full-text search, and RRF fusion)
+    - [x] `backend/tests/` (Pytest test suite)
 
 - [x] **2.2 Centralized Environment Settings:**
   - [x] File: `backend/app/config.py`
