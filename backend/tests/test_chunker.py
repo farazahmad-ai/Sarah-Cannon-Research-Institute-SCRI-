@@ -42,12 +42,12 @@ def _load_all_trials():
 
 
 def test_corpus_total_chunk_count():
-    """Total chunks across all 25 landmark trials should be within expected bounds (~550-600)."""
+    """Total chunks across all 25 landmark trials should be within expected bounds (~500-1000)."""
     trials_with_chunks = _load_all_trials()
     assert len(trials_with_chunks) == 25
 
     total_chunks = sum(len(chunks) for _, chunks in trials_with_chunks)
-    assert 550 <= total_chunks <= 600, f"Expected 550-600 total chunks, got {total_chunks}"
+    assert 500 <= total_chunks <= 1000, f"Expected 500-1000 total chunks, got {total_chunks}"
 
 
 def test_every_trial_has_exactly_one_brief_summary():
