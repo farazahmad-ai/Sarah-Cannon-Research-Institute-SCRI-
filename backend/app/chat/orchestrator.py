@@ -24,6 +24,10 @@ from app.assistant.prompts import (
 )
 from app.assistant.schemas import ChatRequest, ProtocolPassage
 from app.auth.jwt import AuthenticatedUser
+from app.chat.guidance import (
+    build_guidance_response,
+    classify_guidance_intent,
+)
 from app.database.chats import (
     create_thread,
     get_thread,
@@ -100,10 +104,16 @@ def extract_target_nct_ids(message: str, history: list[ChatMessage]) -> list[str
 
     # Priority 1: Check verified citations from recent assistant messages
     for m in reversed(history):
-        if m.role == "assistant" and getattr(m, "citations", None) and not _is_refusal_or_unverified(m):
+        if (
+            m.role == "assistant"
+            and getattr(m, "citations", None)
+            and not _is_refusal_or_unverified(m)
+        ):
             anchors: list[str] = []
             for c in m.citations:
-                nct = getattr(c, "nct_id", None) or (c.get("nct_id") if isinstance(c, dict) else None)
+                nct = getattr(c, "nct_id", None) or (
+                    c.get("nct_id") if isinstance(c, dict) else None
+                )
                 if nct and nct.upper() not in anchors:
                     anchors.append(nct.upper())
             if anchors:
@@ -118,8 +128,6 @@ def extract_target_nct_ids(message: str, history: list[ChatMessage]) -> list[str
     return []
 
 
-
-
 def _is_refusal_or_unverified(msg: ChatMessage) -> bool:
     """Check if an assistant message was a refusal or unverified turn that should not poison LLM context."""
     if msg.role != "assistant":
@@ -127,6 +135,9 @@ def _is_refusal_or_unverified(msg: ChatMessage) -> bool:
     # If the message has verified protocol citations, it is grounded clinical context
     if msg.citations:
         return False
+    meta = msg.metadata_json or {}
+    if meta.get("intent") in ("greeting", "guidance", "catalog", "capabilities"):
+        return True
     lowered = msg.content.lower()
     return any(
         marker in lowered
@@ -141,6 +152,14 @@ def _is_refusal_or_unverified(msg: ChatMessage) -> bool:
             "evidence notice",
         )
     )
+
+
+def _is_screening_query(msg: ChatMessage) -> bool:
+    """Check if a user message is an actual clinical screening query subject to session limits."""
+    if msg.role != "user":
+        return False
+    meta = msg.metadata_json or {}
+    return meta.get("intent") not in ("greeting", "guidance", "catalog", "capabilities")
 
 
 def _trim_history(
@@ -209,16 +228,12 @@ async def stream_chat_turn(
             thread_id = thread.id
             if thread.title in ("New Screening Session", "New session", ""):
                 thread.title = (
-                    request.message[:45] + "..."
-                    if len(request.message) > 45
-                    else request.message
+                    request.message[:45] + "..." if len(request.message) > 45 else request.message
                 )
                 await pre_session.flush()
         else:
             initial_title = (
-                request.message[:45] + "..."
-                if len(request.message) > 45
-                else request.message
+                request.message[:45] + "..." if len(request.message) > 45 else request.message
             )
             thread = await create_thread(pre_session, user_uuid, title=initial_title)
             thread_id = thread.id
@@ -227,8 +242,44 @@ async def stream_chat_turn(
         full_history = await list_messages(pre_session, thread_id, user_uuid)
         history = _trim_history(full_history)
 
+        # 3a. Fast Guidance & Greeting Intent Router (0ms / 0 tokens / Quota-exempt)
+        guidance_intent = classify_guidance_intent(request.message)
+        if guidance_intent:
+            logger.info(
+                "Guidance intent detected for thread %s [intent=%s]: '%s'",
+                thread_id,
+                guidance_intent,
+                request.message,
+            )
+            corpus_manifest = await get_corpus_manifest(pre_session)
+            await pre_session.commit()
+
+            guidance_msg = build_guidance_response(guidance_intent, corpus_manifest)
+            yield f"0:{json.dumps(guidance_msg)}\n"
+            yield 'd:{"finishReason":"stop"}\n'
+
+            try:
+                async with async_session_factory() as post_session:
+                    await persist_turn(
+                        post_session,
+                        thread_id,
+                        request.message,
+                        guidance_msg,
+                        citations=[],
+                        user_metadata={"intent": guidance_intent},
+                        assistant_metadata={"intent": "guidance", "grounded": True},
+                    )
+                    await post_session.commit()
+            except BaseException as exc:
+                logger.error(
+                    "Failed to persist guidance turn for thread %s: %s",
+                    thread_id,
+                    exc,
+                )
+            return
+
         # 3b. Session query cap: prevent context decay, token bloat, and attention loss
-        user_queries_count = sum(1 for m in full_history if m.role == "user")
+        user_queries_count = sum(1 for m in full_history if _is_screening_query(m))
         if user_queries_count >= MAX_QUERIES_PER_SESSION:
             logger.info(
                 "Session limit reached for thread %s (%d queries)",
@@ -255,7 +306,9 @@ async def stream_chat_turn(
                     )
                     await post_session.commit()
             except BaseException as exc:
-                logger.error("Failed to persist session limit turn for thread %s: %s", thread_id, exc)
+                logger.error(
+                    "Failed to persist session limit turn for thread %s: %s", thread_id, exc
+                )
             return
 
         # 4. Retrieve candidate protocol passages via targeted or partitioned hybrid retrieval
@@ -360,7 +413,14 @@ async def stream_chat_turn(
     # Only inject corpus manifest if user is asking about overall catalog coverage
     is_coverage_query = any(
         k in request.message.lower()
-        for k in ("what trials", "which trials", "list trials", "what diseases", "coverage", "how many trials")
+        for k in (
+            "what trials",
+            "which trials",
+            "list trials",
+            "what diseases",
+            "coverage",
+            "how many trials",
+        )
     )
     manifest_for_prompt = corpus_manifest if (is_coverage_query or not passages) else {}
 

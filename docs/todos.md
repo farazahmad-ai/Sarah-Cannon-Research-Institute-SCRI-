@@ -581,4 +581,22 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
     - Thumbs up / Thumbs down reaction buttons on assistant messages.
     - Persists feedback state (`helpful` / `unhelpful`) to chat message `metadata_json` with user tenancy verification for tracking answer quality.
 
+- [x] **8.4 Conversational Greeting & Capability Guidance Router (Zero-Quota Onboarding):**
+  - **Problem:** Coordinators typing *"hi"*, *"hello"*, or asking *"what can you tell me?"* were hit with a rigid off-corpus refusal and burned 1 of their 3 allowed queries per screening session without receiving any guidance on what to ask.
+  - **Solution:** A deterministic, 0ms latency intent router intercepts greetings, capability questions, and catalog inquiries prior to the hybrid retrieval and session limit gates.
+  - **Implementation:**
+    - File: `backend/app/chat/guidance.py`:
+      - `classify_guidance_intent(query)`: Classifies non-clinical greetings, capability inquiries, and corpus catalog overviews in 0ms with zero OpenAI API calls or vector searches.
+      - `build_guidance_response(intent, corpus_manifest)`: Dynamically renders an orientation message detailing copilot purpose, active trial counts by disease category from `corpus_manifest`, and 4 concrete exemplary clinical screening queries.
+      - Strict Clinical Safety Gate: Any query containing an explicit NCT ID or clinical indicators (e.g. *brain metastases*, *washout*, *ANC*, *EGFR*, *ECOG*) strictly bypasses the router and proceeds to hybrid retrieval.
+    - File: `backend/app/chat/orchestrator.py`:
+      - Integrated guidance router before `MAX_QUERIES_PER_SESSION` check.
+      - Implemented `_is_screening_query(m)`: Guidance turns store `metadata_json={"intent": ...}` and do not increment or consume the coordinator's 3-query clinical screening quota.
+      - Updated `_is_refusal_or_unverified(m)` to isolate guidance turns so they do not pollute subsequent multi-turn clinical LLM prompts.
+    - File: `backend/app/database/chats.py`:
+      - Extended `persist_turn` with optional `user_metadata` and `assistant_metadata` for audit tracking.
+    - File: `backend/tests/test_guidance_router.py`:
+      - 45 automated unit tests covering greetings, capabilities, catalog inquiries, clinical term non-interception, response rendering, and quota exemption.
+
+
 

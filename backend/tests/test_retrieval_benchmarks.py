@@ -14,7 +14,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+
 import pytest
+
 from app.database.session import engine
 
 REPORT_PATH = Path(__file__).resolve().parent.parent / "eval" / "reports" / "latest_report.json"
@@ -23,7 +25,7 @@ REPORT_PATH = Path(__file__).resolve().parent.parent / "eval" / "reports" / "lat
 def test_latest_evaluation_report_meets_slas():
     """Verify that the generated benchmark report satisfies all clinical IR targets."""
     assert REPORT_PATH.exists(), f"Benchmark report not found at {REPORT_PATH}. Run eval/evaluate_retrieval.py first."
-    with open(REPORT_PATH, "r", encoding="utf-8") as f:
+    with open(REPORT_PATH, encoding="utf-8") as f:
         data = json.load(f)
 
     metrics = data["metrics"]

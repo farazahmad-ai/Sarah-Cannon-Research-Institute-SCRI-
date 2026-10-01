@@ -7,6 +7,7 @@ mislabeling) and D-2 (numbered-list collapse).
 
 import json
 from pathlib import Path
+
 import pytest
 
 from app.ingest.chunker import chunk_protocol, load_trial_json
