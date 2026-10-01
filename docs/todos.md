@@ -597,9 +597,6 @@ This checklist outlines the logical, end-to-end execution sequence to build **SC
       - Extended `persist_turn` with optional `user_metadata` and `assistant_metadata` for audit tracking.
     - File: `backend/tests/test_guidance_router.py`:
       - 45 automated unit tests covering greetings, capabilities, catalog inquiries, clinical term non-interception, response rendering, and quota exemption.
-  - **Enterprise Evolution Blueprint (Option 1: Semantic Dual-Router):**
-    - Detailed in [`docs/future-implementations.md`](file:///d:/FarazAhmad-ai/projects/Sarah%20Cannon%20Research%20Institute%20%28SCRI%29/docs/future-implementations.md#44-adaptive-conversational-routing-seamless-natural-chat-vs-grounded-protocol-rag-the-semantic-dual-router-architecture) (Section 4.4).
-    - Specifies how enterprise multi-channel routing seamlessly distinguishes natural conversational dialogue, general oncology reference literature (with mandatory clinical disclaimer badges), and strict protocol screening RAG with deterministic entity safety invariants.
 
 
 
